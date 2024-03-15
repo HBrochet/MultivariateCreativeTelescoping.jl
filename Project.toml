@@ -1,0 +1,13 @@
+name = "MultivariateCreativeTelescoping"
+uuid = "a544615c-5478-485f-b703-83893a5a3b3b"
+authors = ["Hadrien Brochet <hadrien.brochet@inria.fr> and contributors"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
