@@ -7,7 +7,9 @@ makedocs(sitename="MultivariateCreativeTelescoping.jl",
         pages = [
             "Presentation" => "index.md",
             "Quick start" => "QuickStart.md"
-        ])
+        ],
+        checkdocs=:none
+        )
 
 deploydocs(
     repo = "github.com/HBrochet/MultivariateCreativeTelescoping.jl",
