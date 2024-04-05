@@ -1,5 +1,3 @@
-abstract type AbsOreAlgebra{C,M,O} end;
-
 # used to easily change from algebra 
 mutable struct OreAlgInput
     order :: String 
@@ -12,7 +10,7 @@ mutable struct OreAlgInput
     nomul :: Vector{String}
 end
 
-struct OreAlg{T, Tbuf, C <:AbsContextCoeff{T,Tbuf}, M <: AbsOreMonomial, O <: AbsMonomialOrder} <: AbsOreAlgebra{C,M,O}
+struct OreAlg{T, C <:AbsContextCoeff, M <: AbsOreMonomial}
     strvar_to_indexp :: Dict{String,Int} # map strings of vars represented in monomials to corresponding index in the exponent
     indexp_to_strvar :: Vector{String} # same but in the other direction
     ratvars :: Dict{String,T}  # maps strings or ratvars represented in the coeff to an object of type T 
@@ -29,6 +27,7 @@ struct OreAlg{T, Tbuf, C <:AbsContextCoeff{T,Tbuf}, M <: AbsOreMonomial, O <: Ab
     pols_loc :: Vector{OrePoly{T,M}} # pol associated to the loc var
     diff_pols_loc :: Vector{Vector{OrePoly{T,M}}} #derivatives of pols_loc
     nomul :: Vector{Int} # indices of the variable with which we can't multiply
+    order :: AbsMonomialOrder
     ctx :: C 
     inp :: OreAlgInput
 end
@@ -42,8 +41,6 @@ end
     locvars :: Tuple{Vector{String},Vector{String}} = (String[],String[]),
     order :: String = "",
     nomul :: Vector{String} = String[]
-
-For more information see the online documentation
 """
 function OreAlg(;order :: String = "",
     char :: Int = 0,
@@ -71,7 +68,7 @@ function OreAlg(;order :: String = "",
     inp = OreAlgInput(order, char,ratvars, ratdiffvars,poldiffvars,polvars,locvars,nomul)
 
     ### Computing the polynomials w.r.t. which we localize and their derivatives
-    tmpA = OreAlg{eltype1_ctx(ctx),eltype2_ctx(ctx), typeof(ctx),M,typeof(ord)}(sti,
+    tmpA = OreAlg{eltype1_ctx(ctx), typeof(ctx),M}(sti,
                                             its,
                                             rv,
                                             rti,
@@ -83,13 +80,14 @@ function OreAlg(;order :: String = "",
                                             OrePoly{T,M}[],
                                             Vector{OrePoly{T,M}}[],
                                             Int[],
+                                            ord,
                                             ctx,
                                             inp)
     
     (polsloc, diff_pols_loc) = compute_locpol_and_derivs(locvars[2],tmpA)
 
     nomul_ = [sti[s] for s in nomul]
-    return OreAlg{eltype1_ctx(ctx),eltype2_ctx(ctx), typeof(ctx),M,typeof(ord)}(sti,
+    return OreAlg{eltype1_ctx(ctx), typeof(ctx),M}(sti,
                                             its,
                                             rv,
                                             rti,
@@ -101,6 +99,7 @@ function OreAlg(;order :: String = "",
                                             polsloc,
                                             diff_pols_loc,
                                             nomul_,
+                                            ord,
                                             ctx,
                                             inp)
 end
@@ -112,7 +111,7 @@ function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars 
         if char > 0 
             S,vars = polynomial_ring(Native.GF(char),vcat(ratdiffvars[1],ratvars))
             F = fraction_field(S)
-            return RatFunCtx(F,S,vars,char)
+            return RatFunModpCtx(F,S,vars,char)
         else 
             S,vars = polynomial_ring(ZZ,vcat(ratdiffvars[1],ratvars))
             F = fraction_field(S)
@@ -194,7 +193,7 @@ function compute_locpol_and_derivs(pollocvars ::Vector{String},A ::OreAlg)
     return (polsloc,diff_pols_loc) 
 end
 
-Base.show(io::IO, A::OreAlg) = print(io,"OreAlgebra")
+Base.show(io::IO,::OreAlg) = print(io,"Ore algebra")
 
 
 
@@ -213,13 +212,13 @@ end
 
 
 
-order(A :: OreAlg{T,Tbuf,K,M,O}) where {T,Tbuf,K,M,O} = O()
+order(A :: OreAlg) = A.order
 ctx(A :: OreAlg) = A.ctx
-eltype_co(A :: OreAlg{T,Tbuf,C,M,O}) where {T, Tbuf, C <: AbsContextCoeff{T, Tbuf},M,O} = T
-eltype_mo(A :: OreAlg{T,Tbuf,K,M,O}) where {T,Tbuf,K,M,O} = M
-makemon(i :: Integer, A :: OreAlg{T, TT, K, M, O}) where {T, TT, K,O,N,E,M <: OreMonVE{N,E}} = OreMonVE(SVector{N,E}(i==j ? E(1) : E(0) for j in 1:N))
+eltype_co(A :: OreAlg{T,C,M}) where {T, C, M} = T
+eltype_mo(A :: OreAlg{T,C,M}) where {T,C,M} = M
+makemon(i :: Integer, A :: OreAlg{T, K, M}) where {T, K,N,E,M <: OreMonVE{N,E}} = OreMonVE(SVector{N,E}(i==j ? E(1) : E(0) for j in 1:N))
 
-function divide(m1 :: OreMonVE, m2 :: OreMonVE{N,E}, A :: AbsOreAlgebra) where {N,E}
+function divide(m1 :: OreMonVE, m2 :: OreMonVE{N,E}, A :: OreAlg) where {N,E}
     for i in A.nomul
         if m1[i] != m2[i]
             return false
@@ -233,7 +232,7 @@ function divide(m1 :: OreMonVE, m2 :: OreMonVE{N,E}, A :: AbsOreAlgebra) where {
     return true 
 end
 
-function iscompatible(m1 :: OreMonVE, m2 :: OreMonVE, A :: AbsOreAlgebra) 
+function iscompatible(m1 :: OreMonVE, m2 :: OreMonVE, A :: OreAlg) 
     for i in A.nomul 
         if m1[i] != m2[i] 
             return false 
@@ -252,14 +251,15 @@ end
 
 
 makepoly(c :: K, m :: M) where {K, M <: AbsOreMonomial} = OrePoly(K[c],M[m]) 
-undefOrePoly(n :: Integer,A :: OreAlg{T,Tbuf,K,M,O}) where {T,Tbuf,K<:AbsContextCoeff{T,Tbuf},M,O} = OrePoly(Vector{T}(undef,n),Vector{M}(undef,n))
+undefOrePoly(n :: Integer,A :: OreAlg{T,C,M}) where {T,C,M} = OrePoly(Vector{T}(undef,n),Vector{M}(undef,n))
 
-Base.zero(A :: OreAlg{T, Tbuf, K,M,O}) where {T,Tbuf,K<:AbsContextCoeff{T,Tbuf},M,O} = OrePoly(T[],M[])
-Base.one(A :: OreAlg{T,Tbuf,K,M,O}) where {T,Tbuf,K<:AbsContextCoeff{T,Tbuf},M,O} = OrePoly(T[convert(1,ctx(A))],M[makemon(-1,A)])
-nvars(A :: OreAlg{T,Tbuf,K,M,O}) where {T,Tbuf,N,E,K,M <:OreMonVE{N,E},O} = N
+Base.zero(A :: OreAlg{T, C,M}) where {T,C,M} = OrePoly(T[],M[])
+Base.one(A :: OreAlg{T,C,M}) where {T,C,M} = OrePoly(T[convert(1,ctx(A))],M[makemon(-1,A)])
+nvars(A :: OreAlg{T,C,M}) where {T,N,E,C,M <:OreMonVE{N,E}} = N
+char(A :: OreAlg) = ctx(A).char
 
 
-function diff(pol_ :: OrePoly, ind_ :: Integer, A ::AbsOreAlgebra)
+function diff(pol_ :: OrePoly, ind_ :: Integer, A ::OreAlg)
     pol = deepcopy(pol_)
     ind = ind_
     if ind <= A.nrdv 
@@ -288,20 +288,27 @@ function diff(pol_ :: OrePoly, ind_ :: Integer, A ::AbsOreAlgebra)
 end
 
 
-function denominator(p :: OrePoly{T,M}, A :: OreAlg) where {M, T <: Generic.FracFieldElem}
-    if length(p) == 0 
-        return ctx(A).R(1)
+function denominator(p :: OrePoly,:: OreAlg)
+    return lcm([Nemo.denominator(c) for c in coeffs(p)])
+end
+
+function clear_denominators!(p :: OrePoly, A :: OreAlg)
+    if ctx(A) isa RatFunCtx
+        den = ctx(A).F(denominator(p, A))
+        mul!(den,p,A)
+    elseif ctx(A) isa QQCtx
+        mul!(QQ(denominator(p,A)),p,A)
     end
-    res = ctx(A).R(1)
-    for c in coeffs(p)
-        res = lcm(res, Nemo.denominator(c))
+end
+
+function clear_denominators!(v :: Vector{OrePoly{T,M}}, A :: OreAlg) where {T,M}
+    for i in 1:length(v)
+        clear_denominators!(v[i],A)
     end
-    return res 
 end
 
 
-
-function isholonomic(gb :: Vector{OrePoly{T,M}},A :: Alg) where {T,M, Alg <:AbsOreAlgebra}
+function isholonomic(gb :: Vector{OrePoly{T,M}},A :: Alg) where {T,M, Alg <:OreAlg}
     #println("testing holonomy")
     N = nvars(A)
     set = [i for i in 1:A.nrdv+2*A.npdv]
@@ -329,7 +336,7 @@ function isholonomic(gb :: Vector{OrePoly{T,M}},A :: Alg) where {T,M, Alg <:AbsO
             end
         end
         if !gfound 
-            #println(subset)
+            # println(subset)
             return false
         end
     end
@@ -384,3 +391,4 @@ end
 function leadingterms(v :: Vector{OrePoly{T,M}}) where {T,M}
     return [OrePoly([coeff(p,1)],[mon(p,1)]) for p in v]
 end
+

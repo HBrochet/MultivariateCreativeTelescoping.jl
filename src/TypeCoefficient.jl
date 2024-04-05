@@ -111,7 +111,7 @@ function normal(a::UInt64, ctx::Nmod32Γ)
 end
 
 function convertn(x :: Integer,ctx :: Nmod32Γ)
-    return convert(x,ctx) % ctx.char
+    return convert(mod(x,ctx.char),ctx)
 end
 
 
@@ -173,46 +173,75 @@ end
 
 
 #. Multivariate rational functions
-abstract type RatFun{T,TT} <: NmodLikeΓ{T, TT} end
+abstract type RatFunCtx{T,TT} <: NmodLikeΓ{T, TT} end
 
-#. Multivariate rational functions
+#. ratfun mod small p 
 
 const RatFunModp = Generic.FracFieldElem{fpMPolyRingElem}
 
-struct RatFunCtx <: RatFun{RatFunModp, RatFunModp}
+struct RatFunModpCtx <: RatFunCtx{RatFunModp, RatFunModp}
     F :: Generic.FracField{Nemo.fpMPolyRingElem}
     R :: fpMPolyRing
     vars :: Vector{fpMPolyRingElem}
     char :: Int  
 end
 
-opp(a :: RatFunModp, ctx :: RatFunCtx) = - a
-add(a :: RatFunModp, b :: RatFunModp, ctx ::RatFunCtx) = a + b 
-mul(a :: RatFunModp, b :: RatFunModp, ctx ::RatFunCtx) = a * b 
-inv(a :: RatFunModp, ctx :: RatFunCtx) = 1/a 
-submul(a :: RatFunModp, b :: RatFunModp, c :: RatFunModp, ctx ::RatFunCtx) = a - b * c 
-normal(a :: RatFunModp, ctx :: RatFunCtx) = a 
-inflate(a :: RatFunModp, ctx :: RatFunCtx) = a 
-deflate(a :: RatFunModp, ctx :: RatFunCtx) = a 
-convert(a :: Integer, ctx :: RatFunCtx) = ctx.F(a)
-convertn(a :: Integer, ctx :: RatFunCtx) = ctx.F(a)
+opp(a :: RatFunModp, ctx :: RatFunModpCtx) = - a
+add(a :: RatFunModp, b :: RatFunModp, ctx ::RatFunModpCtx) = a + b 
+mul(a :: RatFunModp, b :: RatFunModp, ctx ::RatFunModpCtx) = a * b 
+inv(a :: RatFunModp, ctx :: RatFunModpCtx) = 1/a 
+submul(a :: RatFunModp, b :: RatFunModp, c :: RatFunModp, ctx ::RatFunModpCtx) = a - b * c 
+normal(a :: RatFunModp, ctx :: RatFunModpCtx) = a 
+inflate(a :: RatFunModp, ctx :: RatFunModpCtx) = a 
+deflate(a :: RatFunModp, ctx :: RatFunModpCtx) = a 
+convert(a :: Integer, ctx :: RatFunModpCtx) = ctx.F(a)
+convertn(a :: Integer, ctx :: RatFunModpCtx) = ctx.F(a)
 
-Base.one(ctx :: RatFunCtx) = ctx.F(1)
-Base.zero(x :: T, ctx :: RatFunCtx) where T = ctx.F(0)
-Base.zero(ctx :: RatFunCtx) = ctx.F(0)
+Base.one(ctx :: RatFunModpCtx) = ctx.F(1)
+Base.zero(x :: T, ctx :: RatFunModpCtx) where T = ctx.F(0)
+Base.zero(ctx :: RatFunModpCtx) = ctx.F(0)
 
-Base.iszero(x :: RatFunModp, ctx :: RatFunCtx) = x == ctx.F(0)
-Base.isone(x :: RatFunModp, ctx :: RatFunCtx) = x == ctx.F(1)
+Base.iszero(x :: RatFunModp, ctx :: RatFunModpCtx) = x == ctx.F(0)
+Base.isone(x :: RatFunModp, ctx :: RatFunModpCtx) = x == ctx.F(1)
 
+# ratfun mod large p 
 
+const RatFunModP = Generic.FracFieldElem{FpMPolyRingElem}
+
+struct RatFunModPCtx <: RatFunCtx{RatFunModP, RatFunModP}
+    F :: Generic.FracField{Nemo.FpMPolyRingElem}
+    R :: FpMPolyRing
+    vars :: Vector{FpMPolyRingElem}
+    char :: Int  
+end
+
+opp(a :: RatFunModP, ctx :: RatFunModPCtx) = - a
+add(a :: RatFunModP, b :: RatFunModP, ctx ::RatFunModPCtx) = a + b 
+mul(a :: RatFunModP, b :: RatFunModP, ctx ::RatFunModPCtx) = a * b 
+inv(a :: RatFunModP, ctx :: RatFunModPCtx) = 1/a 
+submul(a :: RatFunModP, b :: RatFunModP, c :: RatFunModP, ctx ::RatFunModPCtx) = a - b * c 
+normal(a :: RatFunModP, ctx :: RatFunModPCtx) = a 
+inflate(a :: RatFunModP, ctx :: RatFunModPCtx) = a 
+deflate(a :: RatFunModP, ctx :: RatFunModPCtx) = a 
+convert(a :: Integer, ctx :: RatFunModPCtx) = ctx.F(a)
+convertn(a :: Integer, ctx :: RatFunModPCtx) = ctx.F(a)
+
+Base.one(ctx :: RatFunModPCtx) = ctx.F(1)
+Base.zero(x :: T, ctx :: RatFunModPCtx) where T = ctx.F(0)
+Base.zero(ctx :: RatFunModPCtx) = ctx.F(0)
+
+Base.iszero(x :: RatFunModP, ctx :: RatFunModPCtx) = x == ctx.F(0)
+Base.isone(x :: RatFunModP, ctx :: RatFunModPCtx) = x == ctx.F(1)
 
 ##
 const RatFunQQ = Generic.FracFieldElem{ZZMPolyRingElem}
 
-struct RatFunQQCtx <: RatFun{RatFunQQ,RatFunQQ}
+struct RatFunQQCtx <: RatFunCtx{RatFunQQ,RatFunQQ}
     F :: Generic.FracField{ZZMPolyRingElem}
     R :: ZZMPolyRing
     vars :: Vector{ZZMPolyRingElem}
+    char :: Int
+    RatFunQQCtx(F,R,v) = new(F,R,v,0)
 end
 
 opp(a :: RatFunQQ, ctx :: RatFunQQCtx) = - a
@@ -236,7 +265,10 @@ Base.isone(x :: RatFunQQ, ctx :: RatFunQQCtx) = x == ctx.F(1)
 
 
 ## defining rational coefficient 
-struct QQCtx <: NmodLikeΓ{QQFieldElem,QQFieldElem} end
+struct QQCtx <: NmodLikeΓ{QQFieldElem,QQFieldElem} 
+    char :: Int 
+    QQCtx() = new(0)
+end
 
 opp(a :: QQFieldElem, ctx :: QQCtx) = - a
 add(a :: QQFieldElem, b :: QQFieldElem, ctx ::QQCtx) = a + b 

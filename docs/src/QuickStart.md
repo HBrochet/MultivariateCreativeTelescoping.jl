@@ -4,34 +4,43 @@ DocTestSetup  = quote
     using MultivariateCreativeTelescoping
 end
 ```
+Let us demonstrate how this package work on a very simple example based on Cauchy's integral formula. We will check that the integral 
+```math
+I(t) = \int_\gamma \frac{x}{x-t}dx
+```
+where ``\gamma`` is a loop satisfies the diffential equation ``t\partial_t -1``. 
 
-The first step is to define an algebra using the OreAlg function.
-## Definition of an Algebra 
-The following command create an object of type OreAlg.
-```@docs
-OreAlg
-``` 
-- char is the characteristic of the base field and is by default $0$.
-- ratvars is a vector of string representing rational variables in the base field.
-- ratdiffvars is a pair of vectors of same length representing pairs of variables $(t_i,d_{t_i})$ 
-  that satisfy the relation $d_{t_i}t_i = t_i d_{t_i} +1$. The variables $t_i$ are part of the base field 
-  and the variables $d_{t_i}$ are polynomial variables. 
-- poldiffvars is a pair of vectors of same length representing pairs of variables $(x_i,d_{x_i})$ 
-  that satisfy the relation $d_{x_i}x_i = x_i d_{x_i} +1$. The variables $x_i$ and $d_{x_i}$ are polynomial variables 
-- polvars is a vector of string representing polynomial variables.
-- locvars is a pair of vectors of same length representing pairs $(T_i,p_i)$ where $T_i$ are variable names 
-  and $p_i$ are parsable polynomials in all the previous variables except for $d_{t_i}$ and $d_{x_i}$. 
-  The variables $T_i$ corresponds to the inverse of $p_i$ and satisfy the commutation rule 
-  $d_u T = Td_u - \partial_u(p_i)T^2$ for any $u\in \{ x_i,t_i\}$.
-- order is a parsable order of the form "ord var1 ... varn > ord var1 ... varm > ..." 
-  where ord is currently either lex or grevlex and vari names of the previous variables. 
-- nomul is a vector of strings. If a name of a polynomial variable is in this vector then no multiplication by this  
-  variable will be performed during Gröbner basis computation.
 
-Here is a simple example
-```jldoctest
+
+ We load the package
+
+```jldoctest Quickstart
 julia> using MultivariateCreativeTelescoping
+```
+ We define an algebra of differential operators. The parameter of the integral must be a rational variable and the integration variables must be polynomial variables.
+ The order must eliminate ``dt`` and in general it is advised to take an order of the form ``dt > [\text{polynomial variables}] > [\text{differential variables}]``
 
-julia> A = OreAlg(order = "lex dt > grevlex x dx",ratdiffvars=(["t"],["dt"]),poldiffvars=(["x"],["dx"]))
-OreAlgebra
+```jldoctest Quickstart
+julia> A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]),poldiffvars=(["x"],["dx"]))
+Ore algebra
+```
+
+We remove the largest polynomial factor in the integrand (here ``x``). Then we define a set of differential equations satisfied by what remains, that is ``1/(x-t)``, and take its weyl closure.
+```jldoctest Quickstart
+julia> ann = [parse_OrePoly("dt*(x-t)",A), parse_OrePoly("dx*(x-t)",A)]
+Vector of Ore polynomials
+
+julia> init = weyl_closure_init(A)
+WeylClosureInit
+
+julia> gb = weyl_closure(ann,A,init)
+Vector of Ore polynomials 
+```
+We can now apply the integration algorithm
+```jldoctest Quickstart
+julia> LDE = MCT(parse_OrePoly("x",A), gb, A)
+Ore polynomial 
+
+julia> prettyprint(LDE,A)
+(t)dt + (-1)
 ```

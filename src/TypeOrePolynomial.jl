@@ -12,7 +12,7 @@ Base.show(io::IO, p :: OrePoly) = print(io,"Ore polynomial")
 Base.show(io::IO, ::MIME"text/plain", p :: OrePoly) = print(io,"Ore polynomial")
 
 Base.show(io::IO, v :: Vector{OrePoly}) = print(io,"Vector of Ore polynomials")
-Base.show(io::IO, ::MIME"text/plain", v :: Vector{OrePoly}) = print(io,"Vector of Ore polynomials")
+Base.show(io::IO, ::MIME"text/plain", v :: Vector{OrePoly{T,M}}) where {T,M} = print(io,"Vector of Ore polynomials")
 
 
 
@@ -37,3 +37,6 @@ Base.@propagate_inbounds function Base.setindex!(P::OrePoly{K, M}, t::Tuple{K, M
     setindex!(P.mons, t[2], i)
 end
 
+function degree(p :: OrePoly)
+    return maximum([degree(m[2]) for m in p])
+end

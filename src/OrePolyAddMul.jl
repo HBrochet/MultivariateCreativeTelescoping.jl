@@ -36,7 +36,7 @@ end
 
 ### multiplication for OrePolynomials with context Context
 
-function add!(P :: OrePoly, Q :: OrePoly, A :: AbsOreAlgebra;normal :: Bool =true)
+function add!(P :: OrePoly, Q :: OrePoly, A :: OreAlg;normal :: Bool =true)
     append!(coeffs(P),coeffs(Q))
     append!(mons(P),mons(Q))
     if normal
@@ -45,7 +45,7 @@ function add!(P :: OrePoly, Q :: OrePoly, A :: AbsOreAlgebra;normal :: Bool =tru
     return P
 end
 
-function add2!(P :: OrePoly, Q :: OrePoly, A :: AbsOreAlgebra)
+function add2!(P :: OrePoly, Q :: OrePoly, A :: OreAlg)
     lenp = length(P)
     lenq = length(Q)
     len = lenp + lenq
@@ -93,20 +93,25 @@ function add2!(P :: OrePoly, Q :: OrePoly, A :: AbsOreAlgebra)
     return res
 end
 
-function add(PP :: OrePoly, Q :: OrePoly, A :: AbsOreAlgebra)
+"""
+    add(p :: OrePoly, q :: OrePoly, A :: OreAlg)
+
+Return the Ore polynomial p + q.
+"""
+function add(PP :: OrePoly, Q :: OrePoly, A :: OreAlg)
     P = copy(PP)
     P = add!(P,Q,A)
     return P
 end
 
-function add2(PP :: OrePoly, Q :: OrePoly, A :: AbsOreAlgebra)
+function add2(PP :: OrePoly, Q :: OrePoly, A :: OreAlg)
     P = copy(PP)
     P = add2!(P,Q,A)
     return P
 end
 
 
-function mul(c :: T, P :: OrePoly, A :: OreAlg{T, Tbuf, C, M, O}) where {T, Tbuf, C <:AbsContextCoeff{T,Tbuf}, M <: AbsOreMonomial, O <: AbsMonomialOrder}
+function mul(c :: T, P :: OrePoly, A :: OreAlg{T, C, M}) where {T, C, M}
     res = zero(A)
     append!(mons(res),mons(P))
     resize!(coeffs(res),length(coeffs(P)))
@@ -117,31 +122,40 @@ function mul(c :: T, P :: OrePoly, A :: OreAlg{T, Tbuf, C, M, O}) where {T, Tbuf
     return res
 end
 
-function mul!(c :: T, P :: OrePoly, A :: OreAlg{T, Tbuf, C, M, O}) where {T, Tbuf, C <:AbsContextCoeff{T,Tbuf}, M <: AbsOreMonomial, O <: AbsMonomialOrder}
+function mul!(c :: T, P :: OrePoly, A :: OreAlg{T, C, M}) where {T, C, M}
     cs = coeffs(P)
     for i in eachindex(coeffs(P))
         cs[i] = mul(c, coeff(P,i), ctx(A))
     end
 end
 
-function makemonic!(P :: OrePoly, A :: AbsOreAlgebra)
+function makemonic!(P :: OrePoly, A :: OreAlg)
     mul!(inv(coeff(P,1),ctx(A)),P,A)
 end
 
-function sub!(P :: OrePoly, Q :: OrePoly, A :: AbsOreAlgebra)
+function sub!(P :: OrePoly, Q :: OrePoly, A :: OreAlg)
     append!(coeffs(P), [opp(coeff(Q,i),ctx(A)) for i in 1:length(Q)])
     append!(mons(P),mons(Q))
     return normalize!(P,A)
 end
 
-function sub(PP :: OrePoly, Q :: OrePoly, A :: AbsOreAlgebra)
+"""
+    sub(p :: OrePoly, q :: OrePoly, A :: OreAlg)
+
+Return the Ore polynomial p - q.
+"""
+function sub(PP :: OrePoly, Q :: OrePoly, A :: OreAlg)
     P = copy(PP)
     return sub!(P,Q,A)
 end
 
 
+"""
+    mul(p :: OrePoly, q :: OrePoly, A :: OreAlg)
 
-function mul(P :: OrePoly, Q :: OrePoly, A :: AbsOreAlgebra; normal = true)
+Return the Ore polynomial pq.
+"""
+function mul(P :: OrePoly, Q :: OrePoly, A :: OreAlg; normal = true)
     res = zero(A)
     for i in 1:length(P)
         for j in 1:length(Q)
@@ -155,7 +169,7 @@ function mul(P :: OrePoly, Q :: OrePoly, A :: AbsOreAlgebra; normal = true)
     return res
 end
 
-function mul(T ::Tuple{K,M}, Q :: OrePoly, A :: AbsOreAlgebra; normal = true) where {K,M}
+function mul(T ::Tuple{K,M}, Q :: OrePoly, A :: OreAlg; normal = true) where {K,M}
     res = zero(A)
     for i in 1:length(Q)
         res = add!(res,mul(T,Q[i],A,normal = false),A,normal=false)
@@ -166,7 +180,7 @@ function mul(T ::Tuple{K,M}, Q :: OrePoly, A :: AbsOreAlgebra; normal = true) wh
     return res
 end
 
-function mul(P :: OrePoly, T ::Tuple{K,M}, A :: AbsOreAlgebra; normal = true) where {K,M}
+function mul(P :: OrePoly, T ::Tuple{K,M}, A :: OreAlg; normal = true) where {K,M}
     res = zero(A)
     for i in 1:length(P)
         res = add!(res,mul(P[i],T,A,normal = false),A,normal=false)
@@ -182,7 +196,7 @@ function mul(m :: OreMonVE, p :: OrePoly, A :: OreAlg; normal = true)
 end
 
 
-function mul( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: AbsOreAlgebra; normal=true) where {M,K}
+function mul( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: OreAlg; normal=true) where {M,K}
     res = mul_(T1,T2,A)
     if normal
         normalize!(res,A)
@@ -190,7 +204,7 @@ function mul( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: AbsOreAlgebra; normal=true
     return res
 end
 
-function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: AbsOreAlgebra) where {M,K}
+function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: OreAlg) where {M,K}
     #noncomm = Int[]
     s = 1 # size of the product before the call to normalize!
 
@@ -218,7 +232,7 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: AbsOreAlgebra) where {M,K
         end
     end
 
-    if ctx(A) isa RatFun 
+    if ctx(A) isa RatFunCtx
         for l in 1:A.nrdv
             if T1[2][l] == 0; continue end
             c = derivative(T2[1],ctx(A).vars[l])
@@ -274,6 +288,6 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: AbsOreAlgebra) where {M,K
     return res
 end
 
-function shift(P :: OrePoly{K,M}, m :: M, A :: alg) where {K,M,alg <: AbsOreAlgebra}
+function shift(P :: OrePoly{K,M}, m :: M, A :: alg) where {K,M,alg <: OreAlg}
     return mul(m/mon(P,1),P,A)
 end

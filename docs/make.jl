@@ -6,8 +6,12 @@ makedocs(sitename="MultivariateCreativeTelescoping.jl",
         modules=[MultivariateCreativeTelescoping],
         format = Documenter.HTML(),
         pages = [
-            "Presentation" => "index.md",
-            "Quick start" => "QuickStart.md"
+            "Package presentation" => "index.md",
+            "Quick start" => "QuickStart.md",
+            "Ore algebra" => "OreAlgebra.md",
+            "Multivariate Creative Telescoping" =>"MCT.md",
+            "Other functionalities" => "OtherFunctionalities.md",
+
         ],
         checkdocs=:none
         )
