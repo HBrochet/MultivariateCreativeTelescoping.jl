@@ -5,6 +5,8 @@ DocMeta.setdocmeta!(MultivariateCreativeTelescoping, :DocTestSetup, :(using Mult
 makedocs(sitename="MultivariateCreativeTelescoping.jl",
         modules=[MultivariateCreativeTelescoping],
         format = Documenter.HTML(),
+#        format = Documenter.LaTeX(),
+
         pages = [
             "Package presentation" => "index.md",
             "Quick start" => "QuickStart.md",

@@ -1,9 +1,9 @@
 """
-    parse_vector_OrePoly(s :: String, A::OreAlg)
+    parse_vector_OrePoly(s :: String, A :: OreAlg)
 
 Return a vector of OrePoly corresponding to the parseable string s in the algebra A.
 """
-function parse_vector_OrePoly(s :: String, A::OreAlg)
+function parse_vector_OrePoly(s :: String, A :: OreAlg)
     expr = Meta.parse(s)
     if expr.head != :vect 
         error("input is not a parsable vector")

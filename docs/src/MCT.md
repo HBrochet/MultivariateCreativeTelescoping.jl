@@ -1,6 +1,6 @@
 ### Multivariate Creative Telescoping
 
-Let us define the algebra ``D`` 
+Let us define the algebra 
 ```math
 D = \mathbb{Q}(t)[\boldsymbol{x}]\langle \partial_{t}, \partial_{\boldsymbol{x}}\rangle.
 ```
@@ -17,17 +17,17 @@ In particular if ``I`` is the annihilator of a holonomic function ``f`` then ``L
 provided it has natural boundaries.
 
 
-The signature of the function the following.
+The signature of the function is the following.
 ```@docs
 MCT
 ```
 
 Assumption: 
  - spol corresponds to the operator ``p``
- - gb is a Gröbner basis of a holonomic subideal of ``I``
+ - gb is a Gröbner basis of a holonomic subideal of ``I`` for the order defined in A
  - A corresponds to the algebra ``D`` and its order eliminates ``dt``
 
-It is also advised to use an order of the form ``\text{lex} > \text{grevlex} [\text{polynomial variables}] > \text{grevlex} [\text{differential variables}]``
+It is advised for efficiency to use an order of the form lex ``dt`` > grevlex [list of polynomial variables] > grevlex [list of differential variables]
 
 
 #### Example
@@ -36,19 +36,20 @@ In this example we prove that the integral
 ```math
 I(t) = \int_\gamma \frac{x}{x-t}dx
 ```
-where ``\gamma`` is a loop satisfies the diffential equation ``t\partial_t -1``. 
+where ``\gamma`` is a loop satisfies the differential equation ``t\partial_t -1`` for any ``t`` inside that loop. This reflects the well-known fact ``I(t) = 2i\pi t``.
 
-```jldoctest Quickstart
+First we load the package.
+```jldoctest example
 julia> using MultivariateCreativeTelescoping
 ```
- We define an algebra of differential operators. The parameter of the integral must be a rational variable and the integration variables must be polynomial variables.
- The order must eliminate ``dt`` and in general it is advised to take an order of the form ``dt > [\text{polynomial variables}] > [\text{differential variables}]``
-
-First we compute an holonomic ideal included in the annihilator of ``1/(x-t)``. For more details see the weyl closure subsection of the other functionnalities section.
-```jldoctest Quickstart
+ We define the algebra.
+```jldoctest example
 julia> A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]),poldiffvars=(["x"],["dx"]))
 Ore algebra
+```
+Then we compute an holonomic ideal included in the annihilator of ``1/(x-t)``. For more details see the Weyl closure subsection of the other functionnalities section.
 
+```jldoctest example
 julia> ann = [parse_OrePoly("dt*(x-t)",A), parse_OrePoly("dx*(x-t)",A)]
 Vector of Ore polynomials
 
@@ -59,7 +60,7 @@ julia> gb = weyl_closure(ann,A,init)
 Vector of Ore polynomials 
 ```
 We can now apply the integration algorithm
-```jldoctest Quickstart
+```jldoctest example
 julia> LDE = MCT(parse_OrePoly("x",A), gb, A)
 Ore polynomial 
 

@@ -1,10 +1,10 @@
 The first step is to define an algebra using the OreAlg function.
-## Definition of an Ore Algebra 
-The following command create an object of type OreAlg.
+## Definition of an Ore algebra 
+The following command creates an object of type OreAlg.
 ```@docs
 OreAlg
 ``` 
-- char is the characteristic of the base field and is by default ``0``.
+- char is the characteristic of the base field and is ``0`` by default .
 - ratvars is a vector of string representing rational variables in the base field.
 - ratdiffvars is a pair of vectors of same length representing pairs of variables ``(t_i,d_{t_i})`` 
   satisfying the relation ``d_{t_i}t_i = t_i d_{t_i} +1``. The variables ``t_i`` are part of the base field 
@@ -22,12 +22,8 @@ OreAlg
   variable will be performed during Gröbner basis computations.
 
 
-!!! warning
-    This package does not really implements Weyl algebras in positive characteristic. 
-    It is a computational trick to avoid the growth of coefficients. 
-    In order to ensure that the computations make sense, the characteristic p should be chosen larger than any operator's degree that appear in computations.
-
 #### Example
+The algebra ``\mathbb{Q}(t)[x]\langle \partial_t, \partial_x\rangle`` with the order lex ``dt`` > grevlex ``x`` ``dx`` can be defined with the command
 ```jldoctest DefOA
 julia> using MultivariateCreativeTelescoping
 
@@ -36,7 +32,7 @@ Ore algebra
 ```
 
 ## Creating Ore polynomials
-The most convenient method to create elements of an algebra A is to use the parse_OrePoly and parse_vector_OrePoly functions. 
+The most convenient method to create elements of an algebra A is to use the parse\_OrePoly and parse\_vector\_OrePoly functions. 
 ```@docs
 parse_OrePoly
 ``` 
@@ -55,9 +51,9 @@ Vector of Ore polynomials
 ```
 
 ## Printing Ore polynomials
-We need the information stored in the algebra A to print Ore polynomials. This is done with the prettyprint function.
-Remark that this package use a standard monomial basis with the derivative operators on the left. This is unusual but
-actually very convenient for the computations done in this package.
+Printing is done with the prettyprint function based on information stored in the algebra A.
+Remark that the package uses a standard monomial basis with the derivatives w.r.t. polynomial variables on the left. This is unusual but
+actually more efficient for the computations done in this package.
 
 ```@docs
 prettyprint
@@ -94,7 +90,7 @@ mul(::OrePoly, ::OrePoly, ::OreAlg)
 
 
 ## Exporting Ore polynomials to other systems
-It is possible to convert an OrePoly of a vector of OrePoly to a parsable string which can be parsed by any other computer algebra system
+It is possible to convert an OrePoly of a vector of OrePoly to a parsable string which can be parsed by other computer algebra systems.
 
 ```@docs
 mystring

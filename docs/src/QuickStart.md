@@ -4,11 +4,16 @@ DocTestSetup  = quote
     using MultivariateCreativeTelescoping
 end
 ```
-Let us demonstrate how this package work on a very simple example based on Cauchy's integral formula. We will check that the integral 
+
+## Quickstart 
+
+
+Let us demonstrate how this package works on a very simple example based on Cauchy's integral formula. We will check that the integral 
 ```math
 I(t) = \int_\gamma \frac{x}{x-t}dx
 ```
-where ``\gamma`` is a loop satisfies the diffential equation ``t\partial_t -1``. 
+where ``\gamma`` is a loop satisfies the differential equation ``t\partial_t -1`` for any ``t`` inside that loop. This reflects the well-known fact ``I(t) = 2i\pi t``.
+
 
 
 
@@ -17,19 +22,26 @@ where ``\gamma`` is a loop satisfies the diffential equation ``t\partial_t -1``.
 ```jldoctest Quickstart
 julia> using MultivariateCreativeTelescoping
 ```
- We define an algebra of differential operators. The parameter of the integral must be a rational variable and the integration variables must be polynomial variables.
- The order must eliminate ``dt`` and in general it is advised to take an order of the form ``dt > [\text{polynomial variables}] > [\text{differential variables}]``
+
+We define the algebra 
+```math
+ \mathbb{Q}(t)[x]\langle \partial_t, \partial_x\rangle
+```
+with the order lex ``dt`` ``x`` ``dx``. 
 
 ```jldoctest Quickstart
 julia> A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]),poldiffvars=(["x"],["dx"]))
 Ore algebra
 ```
 
-We remove the largest polynomial factor in the integrand (here ``x``). Then we define a set of differential equations satisfied by what remains, that is ``1/(x-t)``, and take its weyl closure.
+We remove the largest polynomial factor in the integrand (here ``x``). This is done for efficiency reasons.
+ Then we define a set of differential equations satisfied by what remains, that is ``1/(x-t)``. 
 ```jldoctest Quickstart
 julia> ann = [parse_OrePoly("dt*(x-t)",A), parse_OrePoly("dx*(x-t)",A)]
 Vector of Ore polynomials
-
+```
+These equations do not necessarily define a holonomic ideal hence we have to take the Weyl closure.
+```jldoctest Quickstart
 julia> init = weyl_closure_init(A)
 WeylClosureInit
 

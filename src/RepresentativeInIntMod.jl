@@ -8,7 +8,8 @@ Base.show(io :: IO, ::RepInIntMod) = print(io,"RepInIntMod")
 
 """
     representative_in_integral_module_precomp(gb :: Vector{OrePoly{T,M}},sigma :: Int ,A :: OreAlg) where {T,M}
-Precomputation step for the RepInIntMod and irreducible_monomials functions. 
+
+Precomputation step for the representative_in_integral_module and irreducible_monomials functions. 
 """
 function representative_in_integral_module_precomp(gb :: Vector{OrePoly{T,M}},sigma :: Int ,A :: OreAlg) where {T,M}
     g1, g2 = separate(gb, A)
