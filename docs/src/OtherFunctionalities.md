@@ -174,6 +174,7 @@ julia> red = representative_in_integral_module(precomp,parse_OrePoly("x^2",A),A)
 Ore polynomial
 
 julia> prettyprint(red,A)
+(0)
 
 julia> red2 = representative_in_integral_module(precomp,parse_OrePoly("1",A),A)
 Ore polynomial

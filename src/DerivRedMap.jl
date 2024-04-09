@@ -37,7 +37,11 @@ function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: Or
     lm_g1 = [mon(g,1) for g in g1]
     GD_reduction1!(spol,g1,A)
     d = maxdegx(spol,A)
-    tmp =  maximum([maximum([sum(m[i] for i in 2+A.npdv:1+2*A.npdv) - sum(m[i] for i in 2:1+A.npdv) for m in mons(p)]) for p in g2])
+    if length(g2) > 0
+        tmp =  maximum([maximum([sum(m[i] for i in 2+A.npdv:1+2*A.npdv) - sum(m[i] for i in 2:1+A.npdv) for m in mons(p)]) for p in g2])
+    else
+        tmp = 0
+    end
     d = max(d,tmp) + 2
     echelon, next_incr = GD_prereduction_init(g2, g1, d, A)
     lm_ech = SortedSet(order(A),[mon(g,1) for g in echelon])

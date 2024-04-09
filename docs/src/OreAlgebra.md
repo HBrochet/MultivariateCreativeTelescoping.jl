@@ -86,6 +86,10 @@ sub(::OrePoly, ::OrePoly, ::OreAlg)
 ```@docs
 mul(::OrePoly, ::OrePoly, ::OreAlg)
 ```
+```@docs
+length(::OrePoly)
+```
+
 
 
 

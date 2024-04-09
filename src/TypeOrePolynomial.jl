@@ -21,6 +21,11 @@ Base.@propagate_inbounds mon(P :: OrePoly, i :: Integer) = P.mons[i]
 coeffs(P :: OrePoly) = P.coeffs
 Base.@propagate_inbounds coeff(P :: OrePoly, i :: Integer) = P.coeffs[i]
 
+"""
+    Base.length(p :: OrePoly)
+
+Return the number of terms in the polynomial p.
+"""
 Base.length(P :: OrePoly) = length(coeffs(P))
 Base.size(P :: OrePoly) = size(coeffs(P))
 Base.copy(P::OrePoly) = OrePoly(copy(coeffs(P)),copy(mons(P)))

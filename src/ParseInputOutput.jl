@@ -130,10 +130,12 @@ end
 Print the OrePoly p.
 """
 function prettyprint(p :: OrePoly,A ::OreAlg)
-    if length(p) > 0
-        print("(",coeff(p,1),")")
-        printmon(mon(p,1),A)
+    if length(p) == 0 
+        println("(0)")
+        return
     end
+    print("(",coeff(p,1),")")
+    printmon(mon(p,1),A)
     for i in 2:length(p)
         print(" + (", coeff(p,i),")")
         printmon(mon(p,i),A)
