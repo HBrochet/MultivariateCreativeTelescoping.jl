@@ -27,7 +27,7 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...)
         point = add_rand_point!(randpoints,ctx(A).char)
         
         @debug "evaluation of t at a point ($(npoints)th)" 
-        nA = evaluate_parameter_algebra(point,A)
+        nA  = evaluate_parameter_algebra(point,A)
         push!(ev_res, f(nA,evaluate_parameter(point,nA, args...)...))
 
         # trying interpolation
@@ -40,6 +40,7 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...)
             else 
                 @debug "reconstructions don't match, trying another point"
                 prev_res = res
+                succeeded = false
             end
         elseif npoints == bound^2 + 1
             try 
@@ -49,8 +50,8 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...)
                 @debug "success, trying one more point"
             catch 
                 @debug "failure, trying more points"
-                bound += 1
             end 
+            bound += 1
         end
         # if npoints == 2
         #     @debug "interpolation to reconstruct stable mon set"
