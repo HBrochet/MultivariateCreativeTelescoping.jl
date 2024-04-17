@@ -122,3 +122,37 @@ function prettyprint(g :: Vector{SigPair{N,K,M}}, A :: OreAlg) where {M, N, K}
         prettyprint(g[i].op,A)
     end
 end
+
+function isholonomic(gb :: Vector{SigPair{N,C,M}},A :: OreAlg) where {N,C,M}
+    #println("testing holonomy")
+    set = [i for i in 1:A.nrdv+2*A.npdv]
+    n = A.npdv
+    # returns an iterator over every subset of set of size n+1
+    it = powerset(set,n+1,n+1) 
+
+    for subset in it 
+        gfound = false
+        for i in 1:length(gb)
+            if A.nlv > 0 && mon(gb[i],1)[A.nrdv+2*A.npdv+A.npv+1] > 0
+                continue
+            end 
+            # test if gb[i] verifies the criterion
+            b = true  
+            for j in 1:N
+                if !(j in subset) && mon(gb[i],1)[j] != 0
+                    b = false
+                    break
+                end
+            end
+            if b 
+                gfound = true
+                break
+            end
+        end
+        if !gfound 
+            # println(subset)
+            return false
+        end
+    end
+    return true
+end

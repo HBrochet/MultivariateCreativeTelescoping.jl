@@ -19,13 +19,14 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...)
 
     @debug "evaluation of t at a point ($(npoints)th)" 
     point = add_rand_point!(randpoints,ctx(A).char)
+    globalstats.counters[:number_evaluation] += 1
     nA = evaluate_parameter_algebra(point,A)
     ev_res = [f(nA,evaluate_parameter(point,nA, args...)...)]
 
     while true 
         npoints += 1 
         point = add_rand_point!(randpoints,ctx(A).char)
-        
+        globalstats.counters[:number_evaluation] += 1
         @debug "evaluation of t at a point ($(npoints)th)" 
         nA  = evaluate_parameter_algebra(point,A)
         push!(ev_res, f(nA,evaluate_parameter(point,nA, args...)...))

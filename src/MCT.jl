@@ -16,7 +16,7 @@ end
 """
 function MCT(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg) where {T,M}
     if char(A) > 0 
-        error("characteristic must be zero")
+        return MCT_internal(spol,gb,A)
     else
         return compute_with_CRT(MCT_internal,A, spol,gb,A)
     end

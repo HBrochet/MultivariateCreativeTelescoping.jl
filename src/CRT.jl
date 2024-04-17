@@ -1,5 +1,6 @@
 function compute_with_CRT(f :: Function, A :: OreAlg, args...)
     nprime = 1
+    globalstats.counters[:number_primes] += 1
     primes_ = [primes[1]]
     prime = primes[1]
     bound = 1
@@ -13,7 +14,6 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...)
         nA = change_alg_char_QQ(prime,A)
         res_modp = [f(change_coefficient_field(nA,args...)...)]
     end
-
     let prev_res
     while true 
         if succeeded 
@@ -47,9 +47,9 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...)
         # end
 
         nprime += 1 
+        globalstats.counters[:number_primes] += 1
         prime = primes[nprime]
         push!(primes_,prime)
-
         @debug "computing ggd for $(nprime)th prime"
         if ctx(A) isa RatFunCtx
             nA = change_alg_char_ratfun(prime,A)
