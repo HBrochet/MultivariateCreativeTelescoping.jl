@@ -36,7 +36,7 @@ end
 
 ### multiplication for OrePolynomials with context Context
 
-function add!(P :: OrePoly, Q :: OrePoly, A :: OreAlg;normal :: Bool =true)
+function add2!(P :: OrePoly, Q :: OrePoly, A :: OreAlg;normal :: Bool =true)
     append!(coeffs(P),coeffs(Q))
     append!(mons(P),mons(Q))
     if normal
@@ -45,7 +45,7 @@ function add!(P :: OrePoly, Q :: OrePoly, A :: OreAlg;normal :: Bool =true)
     return P
 end
 
-function add2!(P :: OrePoly, Q :: OrePoly, A :: OreAlg)
+function add!(P :: OrePoly, Q :: OrePoly, A :: OreAlg; normal :: Bool = true)
     lenp = length(P)
     lenq = length(Q)
     len = lenp + lenq
@@ -54,42 +54,40 @@ function add2!(P :: OrePoly, Q :: OrePoly, A :: OreAlg)
     iq = 1
     s = 1
     while ip <= lenp && iq <= lenq
-        if lt(order(A),mon(P,ip),mon(Q,iq))
-            c = coeff(Q,iq)
-            m = mon(Q,iq)
-            iq +=1
-        else
-            c = coeff(P,ip)
-            m = mon(P,ip)
+        if lt(order(A),mon(Q,iq),mon(P,ip))
+            res[s] = P[ip]
+            ip += 1
+            s += 1
+        elseif mon(P,ip) == mon(Q,iq)
+            c = add(coeff(P,ip), coeff(Q,iq), ctx(A))
+            if !iszero(c,ctx(A))
+                res[s] = (c, mon(P,ip))
+                s +=1
+            end
             ip +=1
-        end
-        while iq <= lenq && m == mon(Q,iq)
-            c = add(c, coeff(Q, iq),ctx(A))
             iq +=1
-        end
-        while ip <= lenp && m == mon(P,ip)
-            c = add(c, coeff(P, ip),ctx(A))
-            ip +=1
-        end
-        # println("partial res ")
-        # println(c,m)
-        if !iszero(c,ctx(A))
-            res[s] = (c,m)
+        else 
+            res[s] = Q[iq]
+            iq += 1
             s += 1
         end
     end
-    while ip <= lenp
-        res[s] = (coeff(P,ip),mon(P,ip))
-        s += 1
-        ip += 1
-    end
     while iq <= lenq
-        res[s] = (coeff(Q,iq),mon(Q,iq))
-        s += 1
-        iq += 1
+        res[s] = Q[iq]
+        iq +=1
+        s +=1
     end
+    while ip <= lenp 
+        res[s] = P[ip]
+        ip +=1
+        s +=1
+    end
+
     resize!(coeffs(res), s-1)
     resize!(mons(res), s-1)
+    # @assert all(!(c==zero(ctx(A))) for c in coeffs(P))
+    # @assert all(!(c==zero(ctx(A))) for c in coeffs(Q))
+    # @assert all(!(c==zero(ctx(A))) for c in coeffs(res))
     return res
 end
 
@@ -110,8 +108,30 @@ function add2(PP :: OrePoly, Q :: OrePoly, A :: OreAlg)
     return P
 end
 
+function add(v_ :: Vector{OrePoly{T,M}},A :: OreAlg) where {T,M}
+    v = v_
+    len = length(v)
 
-function mul(c :: T, P :: OrePoly, A :: OreAlg{T, C, M}) where {T, C, M}
+    if len == 0 
+        return zero(A)
+    end
+    while len > 1
+        n = div(len,2)
+        tmp = OrePoly{T,M}[]
+        for i in 1:n
+            push!(tmp,add!(v[2*i-1],v[2*i],A))
+        end
+        if isodd(len)
+            push!(tmp,v[end])
+        end
+        v = tmp
+        len = length(v)
+    end
+    return v[1]
+end
+
+
+function mul(c :: T, P :: OrePoly, A :: OreAlg{T, C, M,O}) where {T, C, M,O}
     res = zero(A)
     append!(mons(res),mons(P))
     resize!(coeffs(res),length(coeffs(P)))
@@ -122,7 +142,7 @@ function mul(c :: T, P :: OrePoly, A :: OreAlg{T, C, M}) where {T, C, M}
     return res
 end
 
-function mul!(c :: T, P :: OrePoly, A :: OreAlg{T, C, M}) where {T, C, M}
+function mul!(c :: T, P :: OrePoly, A :: OreAlg{T, C, M,O}) where {T, C, M,O}
     cs = coeffs(P)
     for i in eachindex(coeffs(P))
         cs[i] = mul(c, coeff(P,i), ctx(A))
@@ -133,7 +153,51 @@ function makemonic!(P :: OrePoly, A :: OreAlg)
     mul!(inv(coeff(P,1),ctx(A)),P,A)
 end
 
-function sub!(P :: OrePoly, Q :: OrePoly, A :: OreAlg)
+function sub!(P :: OrePoly, Q :: OrePoly, A :: OreAlg; normal :: Bool = true)
+    lenp = length(P)
+    lenq = length(Q)
+    len = lenp + lenq
+    res = undefOrePoly(len,A)
+    ip = 1
+    iq = 1
+    s = 1
+
+    while ip <= lenp && iq <= lenq
+        if lt(order(A),mon(Q,iq),mon(P,ip))
+            res[s] = P[ip]
+            ip += 1
+            s += 1
+        elseif mon(P,ip) == mon(Q,iq)
+            c = sub(coeff(P,ip), coeff(Q,iq), ctx(A))
+            if !iszero(c,ctx(A))
+                res[s] = (c, mon(P,ip))
+                s +=1
+            end
+            ip +=1
+            iq +=1
+        else 
+            res[s] = (opp(coeff(Q,iq),ctx(A)), mon(Q,iq))
+            iq += 1
+            s += 1
+        end
+    end
+    while iq <= lenq
+        res[s] = (opp(coeff(Q,iq),ctx(A)), mon(Q,iq))
+        iq +=1
+        s +=1
+    end
+    while ip <= lenp 
+        res[s] = P[ip]
+        ip +=1
+        s +=1
+    end
+
+    resize!(coeffs(res), s-1)
+    resize!(mons(res), s-1)
+    return res
+end
+
+function sub2!(P :: OrePoly, Q :: OrePoly, A :: OreAlg)
     append!(coeffs(P), [opp(coeff(Q,i),ctx(A)) for i in 1:length(Q)])
     append!(mons(P),mons(Q))
     return normalize!(P,A)
@@ -156,39 +220,29 @@ end
 Return the Ore polynomial pq.
 """
 function mul(P :: OrePoly, Q :: OrePoly, A :: OreAlg; normal = true)
-    res = zero(A)
+    vec = typeof(P)[]
     for i in 1:length(P)
         for j in 1:length(Q)
-            tmp = mul(P[i],Q[j],A,normal=false)
-            res = add!(res,tmp,A,normal = false)
+            push!(vec,mul(P[i],Q[j],A))
         end
     end
-    if normal
-        normalize!(res,A)
-    end
-    return res
+    return add(vec,A)
 end
 
 function mul(T ::Tuple{K,M}, Q :: OrePoly, A :: OreAlg; normal = true) where {K,M}
-    res = zero(A)
-    for i in 1:length(Q)
-        res = add!(res,mul(T,Q[i],A,normal = false),A,normal=false)
+    vec = typeof(Q)[]
+    for j in 1:length(Q)
+        push!(vec,mul(T,Q[j],A))
     end
-    if normal
-        normalize!(res,A)
-    end
-    return res
+    return add(vec,A)
 end
 
 function mul(P :: OrePoly, T ::Tuple{K,M}, A :: OreAlg; normal = true) where {K,M}
-    res = zero(A)
+    vec = typeof(P)[]
     for i in 1:length(P)
-        res = add!(res,mul(P[i],T,A,normal = false),A,normal=false)
+        push!(vec,mul(P[i],T,A))
     end
-    if normal
-        normalize!(res,A)
-    end
-    return res
+    return add(vec,A)
 end
 
 function mul(m :: OreMonVE, p :: OrePoly, A :: OreAlg; normal = true)
@@ -220,12 +274,12 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: OreAlg) where {M,K}
                     fact1 = (T1[1], T1[2]/ Tpower)
                     fact2 = makepoly(T2[1],dt*Tpower)
 
-                    tmp = mul(A.diff_pols_loc[l][k], makepoly(T2[1]*convertn(T1[2][indT],ctx(A)),T^(T1[2][indT]+1)),A,normal=false)
-                    fact2 = add!(fact2, tmp, A,normal=false)
+                    tmp = mul(A.diff_pols_loc[l][k], makepoly(T2[1]*convertn(Int(T1[2][indT]),ctx(A)),T^(T1[2][indT]+1)),A,normal=true)
+                    fact2 = add!(fact2, tmp, A,normal=true)
 
 
                     fact3 = (one(ctx(A)), T2[2]/dt)
-                    tmp = mul(fact1,mul(fact2,fact3,A,normal=false),A,normal=false)
+                    tmp = mul(fact1,mul(fact2,fact3,A,normal=true),A,normal=true)
                     return tmp
                 end
             end
@@ -235,7 +289,11 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: OreAlg) where {M,K}
     if ctx(A) isa RatFunCtx
         for l in 1:A.nrdv
             if T1[2][l] == 0; continue end
-            c = derivative(T2[1],ctx(A).vars[l])
+            if ctx(A) isa MRatFunCtx
+                c = derivative(T2[1],ctx(A).vars[l])
+            else 
+                c = derivative(T2[1])
+            end
             if iszero(c,ctx(A)); continue end
             res = undefOrePoly(T1[2][l]+1,A)
             dt = makemon(l,A)
@@ -243,10 +301,14 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: OreAlg) where {M,K}
             ctr = 2
             for i in T1[2][l]-1:-1:0
                 res[ctr] = (c*binomial(Int(T1[2][l]),i), T2[2] * dt^i)
-                c = derivative(c,ctx(A).vars[l])
+                if ctx(A) isa MRatFunCtx
+                    c = derivative(c,ctx(A).vars[l])
+                else 
+                    c = derivative(c)
+                end
                 ctr += 1
             end
-            return mul((T1[1],T1[2] / dt^T1[2][l]), res, A,normal=false)
+            return mul((T1[1],T1[2] / dt^T1[2][l]), res, A,normal=true)
         end 
     end
 

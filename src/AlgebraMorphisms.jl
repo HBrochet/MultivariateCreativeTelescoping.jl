@@ -79,18 +79,23 @@ function change_alg_char_ratfun(prime_ :: Integer, A :: OreAlg)
     R = parent(change_coefficient_ring(CRing,ctx(A).vars[1]))
     F = fraction_field(R)
     nvars = [change_coefficient_ring(CRing,var) for var in ctx(A).vars]
-    nctx = RatFunModpCtx(F,R,nvars,prime)
-
-    ev_ratvars = Dict{String,RatFunModp}()
+    if ctx(A) isa UnivRatFunCtx
+        nctx = UnivRatFunModpCtx(F,R,nvars,prime)
+        ev_ratvars = Dict{String,UnivRatFunModp}()
+        T = UnivRatFunModp
+    else
+        nctx = RatFunModpCtx(F,R,nvars,prime)
+        ev_ratvars = Dict{String,RatFunModp}()
+        T = RatFunModp
+    end
     for k in keys(A.ratvars)
-        ev_ratvars[k] = F(change_coefficient_ring(CRing, numerator(A.ratvars[k])))
+        ev_ratvars[k] = F(change_coefficient_ring(CRing, numerator(A.ratvars[k], false)))
     end
     inp = deepcopy(A.inp)
     inp.char = prime
 
-    T = RatFunModp
     M = eltype_mo(A)
-    tmpA = OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),}(A.strvar_to_indexp,
+    tmpA = OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
                                                                 A.indexp_to_strvar,
                                                                 ev_ratvars,                                                               
                                                                 A.rvars_to_int,
@@ -109,7 +114,7 @@ function change_alg_char_ratfun(prime_ :: Integer, A :: OreAlg)
     pl = [change_coefficient_field(CRing,p,tmpA) for p in A.pols_loc]
     dpl = [change_coefficient_field(CRing,v,tmpA) for v in A.diff_pols_loc]
 
-    return OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),}(A.strvar_to_indexp,
+    return OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
                                                                 A.indexp_to_strvar,
                                                                 ev_ratvars,                                                               
                                                                 A.rvars_to_int,
@@ -137,7 +142,7 @@ function change_alg_char_QQ(prime :: Integer, A :: OreAlg)
 
     T = UInt32
     M = eltype_mo(A)
-    tmpA = OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),}(A.strvar_to_indexp,
+    tmpA = OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
                                                                 A.indexp_to_strvar,
                                                                 nratvars,                                                               
                                                                 A.rvars_to_int,
@@ -156,7 +161,7 @@ function change_alg_char_QQ(prime :: Integer, A :: OreAlg)
     pl = [change_coefficient_field(p,tmpA) for p in A.pols_loc]
     dpl = [change_coefficient_field(v,tmpA) for v in A.diff_pols_loc]
 
-    return OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),}(A.strvar_to_indexp,
+    return OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
                                                                 A.indexp_to_strvar,
                                                                 nratvars,                                                               
                                                                 A.rvars_to_int,
@@ -185,8 +190,15 @@ function change_coefficient_field(R :: Ring, p :: OrePoly, A :: OreAlg)
 end
 
 function change_coefficient_field(R :: Ring, p :: Generic.FracFieldElem{ZZMPolyRingElem}, A :: OreAlg)
-    num = numerator(p)
-    den = Nemo.denominator(p)
+    num = numerator(p, false)
+    den = Nemo.denominator(p, false)
+    F = ctx(A).F
+    return F(change_coefficient_ring(R,num)) / F(change_coefficient_ring(R,den))
+end
+
+function change_coefficient_field(R :: Ring, p :: Generic.FracFieldElem{ZZPolyRingElem}, A :: OreAlg)
+    num = numerator(p, false)
+    den = Nemo.denominator(p, false)
     F = ctx(A).F
     return F(change_coefficient_ring(R,num)) / F(change_coefficient_ring(R,den))
 end
@@ -258,7 +270,7 @@ function evaluate_parameter_algebra(p :: Int,A :: OreAlg)
     new_ctx = Nmod32Γ(ctx(A).char)
     T = eltype1_ctx(new_ctx)
     M = eltype_mo(A)
-    tmpA = OreAlg{T,typeof(new_ctx),eltype_mo(A)}(A.strvar_to_indexp,
+    tmpA = OreAlg{T,typeof(new_ctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
                     A.indexp_to_strvar,
                     Dict{String,UInt32}(),
                     Dict{String,Int}(),
@@ -275,7 +287,7 @@ function evaluate_parameter_algebra(p :: Int,A :: OreAlg)
                     A.inp)
     ev_pol_locs = evaluate_parameter(A.pols_loc, p, tmpA)
     ev_diff_pols_loc = evaluate_parameter(A.diff_pols_loc, p, tmpA)
-    return OreAlg{eltype1_ctx(new_ctx),typeof(new_ctx),eltype_mo(A)}(A.strvar_to_indexp,
+    return OreAlg{eltype1_ctx(new_ctx),typeof(new_ctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
                     A.indexp_to_strvar,
                     Dict{String,UInt32}(),
                     Dict{String,Int}(),
@@ -294,19 +306,26 @@ end
 
 function evaluate_parameter(pol :: OrePoly, point :: Int, A :: OreAlg) 
     T = eltype_co(A)
-    ncoeffs = [T(evaluate(c,[point]).data) for c in coeffs(pol)]
+    ncoeffs = T[T(evaluate(c,point).data) for c in coeffs(pol)]
     return OrePoly(ncoeffs,deepcopy(mons(pol)))
 end
     
 function evaluate_parameter(g :: Vector{OrePoly{T,M}}, point :: Int, A :: OreAlg)  where {T, M}
     return [evaluate_parameter(a, point, A) for a in g]
 end
+
+function evaluate_parameter(d :: Dict{M,OrePoly{T,M}}, point :: Int, A :: OreAlg)  where {T, M}
+    return Dict(k=>evaluate_parameter(d[k],point,A) for k in keys(d))
+end
     
     
 function evaluate_parameter(g :: Vector{Vector{OrePoly{T,M}}}, point :: Int,  A :: OreAlg) where  {T,M}
     return [evaluate_parameter(a, point, A) for a in g]
 end
-    
+   
+function evaluate_parameter(t :: Tuple,p:: Int,A:: OreAlg)
+    return (evaluate_parameter(t[1],p,A), evaluate_parameter(t[2],p,A))
+end
 function evaluate_parameter(a :: Any,:: Int,:: OreAlg)
     return a 
 end
@@ -314,4 +333,126 @@ end
 function evaluate_parameter(p ::Int, A :: OreAlg, args...)
     return (evaluate_parameter(arg,p,A) for arg in args)
 end
+
+function evaluate_parameter_cbl(cbl :: UnivRatFunModp ,randpoints :: Vector{Int},A :: OreAlg)
+    return [UInt32(Nemo.evaluate(Nemo.denominator(cbl, false),point).data) for point in randpoints]
+end
+
+### Evaluate the single parameter at many points using multievaluation 
+
+
+function evaluate_parameter_many(glen :: Int, randpoints :: Vector{Int}, nA :: OreAlg, args...)
+    vpoints = new_rand_points(randpoints,Int(char(nA)),glen)
+    _vpoints = [UInt(p) for p in vpoints]
+    return vpoints, Tuple(evaluate_parameter_many(arg,_vpoints,nA) for arg in args...)
+end
+
+
+function new_rand_points(vec :: Vector{Int}, p :: Int,len :: Int)
+    l = 0 
+    res = Int[]
+    while l<len  
+        point = mod(rand(Int),p)
+        if !(point in vec) && !(point in res)
+            push!(res,point)
+            l += 1
+        end
+    end
+    return res
+end
+
+function evaluate_parameter_many(pol :: OrePoly, v :: Vector{UInt}, nA:: OreAlg) 
+    T = eltype_co(nA)
+    M = eltype_mo(nA)
+    tmp = Vector{Tuple{Vector{UInt}, Vector{UInt}}}(undef,length(pol))
+    for i in 1:length(pol)
+        tmp[i] = evaluate_many(coeff(pol,i),v)
+    end
+    res = Vector{OrePoly{T,M}}(undef,length(v))
+    for l in 1:length(v)
+        cs = Vector{T}(undef,length(pol))
+        for i in 1:length(pol)
+            cs[i] = mul(T(tmp[i][1][l]),inv(T(tmp[i][2][l]),ctx(nA)),ctx(nA))
+        end
+        res[l] = OrePoly(cs,deepcopy(mons(pol)))
+    end
+    return res
+end
+
+
+
+    
+function evaluate_parameter_many(g :: Vector{OrePoly{TT,M}}, v :: Vector{UInt}, nA :: OreAlg)  where {TT, M}
+    T = eltype_co(nA)
+    tmp = Vector{Vector{OrePoly{T,M}}}(undef,length(g))
+    for i in 1:length(g)
+        tmp[i] = evaluate_parameter_many(g[i],v,nA)
+    end
+    res = Vector{Vector{OrePoly{T,M}}}(undef,length(v))
+    for l in 1:length(v)
+        gg = Vector{OrePoly{T,M}}(undef,length(g))
+        for i in 1:length(g)
+            gg[i] = tmp[i][l]
+        end
+        res[l] = gg
+    end
+    return res
+end
+
+function evaluate_parameter_many(d :: Dict{M,OrePoly{TT,M}}, v :: Vector{UInt}, nA :: OreAlg)  where {TT, M}
+    T = eltype_co(nA)
+    tmp = Dict{M,Vector{OrePoly{T,M}}}()
+    for k in keys(d)
+        tmp[k] = evaluate_parameter_many(d[k],v,nA)
+    end
+    res = Vector{Dict{M,OrePoly{T,M}}}(undef,length(v))
+    for l in 1:length(v)
+        dd = Dict{M,OrePoly{T,M}}()
+        for k in keys(d)
+            dd[k] = tmp[k][l]
+        end
+        res[l] = dd
+    end
+    return res
+end
+    
+
+function evaluate_parameter_many(mat :: Generic.MatSpaceElem{Generic.FracFieldElem{Nemo.fpPolyRingElem}}, v :: Vector{UInt}, nA :: OreAlg)
+    nc = number_of_columns(mat)
+    nr = number_of_rows(mat)
+
+    tmp = Matrix{Tuple{Vector{UInt}, Vector{UInt}}}(undef,nr,nc)
+    for j in 1:nc
+        for i in 1:nr 
+            tmp[i,j] = evaluate_many(mat[i,j],v)
+        end
+    end
+
+    S = Native.GF(Int(char(nA)))
+    M = matrix_space(S,nr,nc)
+    res = Vector{fpMatrix}(undef,length(v))
+
+    for l in 1:length(v)
+        evmat = M()
+        for j in 1:nc
+            for i in 1:nr 
+                evmat[i,j] = S(tmp[i,j][1][l]) //  S(tmp[i,j][2][l])
+            end
+        end
+        res[l] = evmat
+    end
+    return res
+end
+
+
+# function evaluate_parameter(g :: Vector{Vector{OrePoly{T,M}}}, point :: Int,  A :: OreAlg) where  {T,M}
+#     return [evaluate_parameter(a, point, A) for a in g]
+# end
+   
+# function evaluate_parameter(t :: Tuple,p:: Int,A:: OreAlg)
+#     return (evaluate_parameter(t[1],p,A), evaluate_parameter(t[2],p,A))
+# end
+# function evaluate_parameter(a :: Any,:: Int,:: OreAlg)
+#     return a 
+# end
 

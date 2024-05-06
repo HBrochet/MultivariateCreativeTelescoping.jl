@@ -3,3 +3,5 @@
 /docs/Manifest.toml
 /benchmark
 debugfile.jl
+/profiling
+/.vscode

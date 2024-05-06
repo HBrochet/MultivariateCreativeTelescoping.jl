@@ -38,7 +38,10 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...)
                 bound += 1 
             end
         end
-        # if nprime == 20
+        # if nprime == 10
+        #     # for i in 1:5 
+        #     #     prettyprint(res_modp[i],A)
+        #     # end
         #     prev_res = crt(res_modp, primes_, A)
         #     clear_denominators!(prev_res,A)
         #     succeeded = true 
@@ -70,21 +73,21 @@ function crt(vec :: Vector{OrePoly{K,M}}, primes_ :: Vector{Int}, A :: OreAlg) w
     prodp = prod(primes)
     for i in 1:length(vec[1])
         num = zero(ctx(A).F)
-        term1 = numerator(coeff(vec[1],i))
+        term1 = numerator(coeff(vec[1],i),false)
         for j in 1:length(term1)
-            cs = [ZZ(Nemo.coeff(numerator(coeff(vec[k],i)), j).data) for k in 1:length(vec)]
+            cs = [ZZ(Nemo.coeff(numerator(coeff(vec[k],i),false), j).data) for k in 1:length(vec)]
             c = Nemo.crt(cs, primes)
             c = Nemo.reconstruct(c,prodp)
-            num += ctx(A).F(ctx(A).R([numerator(c)],[exponent_vector(term1,j)])) / ctx(A).F(Nemo.denominator(c))
+            num += ctx(A).F(ctx(A).R([numerator(c,false)],[exponent_vector(term1,j)])) / ctx(A).F(Nemo.denominator(c,false))
         end
 
         den = zero(ctx(A).F)
-        term1 = Nemo.denominator(coeff(vec[1],i))
+        term1 = Nemo.denominator(coeff(vec[1],i),false)
         for j in 1:length(term1)
-            cs = [ZZ(Nemo.coeff(Nemo.denominator(coeff(vec[k],i)), j).data) for k in 1:length(vec)]
+            cs = [ZZ(Nemo.coeff(Nemo.denominator(coeff(vec[k],i),false), j).data) for k in 1:length(vec)]
             c = Nemo.crt(cs, primes)
             c = Nemo.reconstruct(c,prodp)
-            den += ctx(A).F(ctx(A).R([numerator(c)],[exponent_vector(term1,j)])) / ctx(A).F(Nemo.denominator(c))
+            den += ctx(A).F(ctx(A).R([numerator(c,false)],[exponent_vector(term1,j)])) / ctx(A).F(Nemo.denominator(c,false))
         end
 
         push!(cos, num/den)
@@ -92,7 +95,35 @@ function crt(vec :: Vector{OrePoly{K,M}}, primes_ :: Vector{Int}, A :: OreAlg) w
     return OrePoly(cos,deepcopy(mons(vec[1])))
 end
 
-function crt(vec :: Vector{OrePoly{K,M}}, primes_ :: Vector{Int},:: OreAlg{T,C,M}) where {K,M,T,C<: QQCtx}
+function crt(vec :: Vector{OrePoly{K,M}}, primes_ :: Vector{Int}, A :: OreAlg) where {K <: UnivRatFunModp, M}
+    primes = [ZZ(prime) for prime in primes_]
+    cos = UnivRatFunQQ[]
+    prodp = prod(primes)
+    for i in 1:length(vec[1])
+        num = zero(ctx(A).F)
+        term1 = numerator(coeff(vec[1],i),false)
+        for j in 0:length(term1)-1
+            cs = [ZZ(Nemo.coeff(numerator(coeff(vec[k],i),false), j).data) for k in 1:length(vec)]
+            c = Nemo.crt(cs, primes)
+            c = Nemo.reconstruct(c,prodp)
+            num += ctx(A).F(numerator(c,false)*ctx(A).vars[1]^j) / ctx(A).F(Nemo.denominator(c,false))
+        end
+
+        den = zero(ctx(A).F)
+        term1 = Nemo.denominator(coeff(vec[1],i),false)
+        for j in 0:length(term1)-1
+            cs = [ZZ(Nemo.coeff(Nemo.denominator(coeff(vec[k],i),false), j).data) for k in 1:length(vec)]
+            c = Nemo.crt(cs, primes)
+            c = Nemo.reconstruct(c,prodp)
+            den += ctx(A).F(numerator(c,false)*ctx(A).vars[1]^j) / ctx(A).F(Nemo.denominator(c,false))
+        end
+
+        push!(cos, num/den)
+    end
+    return OrePoly(cos,deepcopy(mons(vec[1])))
+end
+
+function crt(vec :: Vector{OrePoly{K,M}}, primes_ :: Vector{Int},:: OreAlg{T,C,M,O}) where {K,M,T,O,C<: QQCtx}
     primes = [ZZ(prime) for prime in primes_]
     cos = Vector{QQFieldElem}(undef,length(vec[1]))
     prodp = prod(primes)

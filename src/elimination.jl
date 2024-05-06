@@ -1,4 +1,4 @@
-const NmodF4Matrix{I, T, Tbuf} = F4Matrix{M,I,T,Alg} where {T,Tbuf,C <: AbsContextCoeff{T, Tbuf},M,Alg <:OreAlg{T,C,M}}
+const NmodF4Matrix{I, T, Tbuf} = F4Matrix{M,I,T,Alg} where {T,Tbuf,C <: AbsContextCoeff{T, Tbuf},M,O,Alg <:OreAlg{T,C,M,O}}
 
 
 

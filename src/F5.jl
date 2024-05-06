@@ -56,14 +56,15 @@ end
 
 
 function sigdiv!(redf :: SigPair, sgb :: Vector{SigPair{N,T,M}}, so :: SigOrder, A :: OreAlg) where {N,T,M}
+    res = redf
     r = 1
     divhappened = false
-    while r <= length(redf.op)
+    while r <= length(res.op)
         div = false
         for i in length(sgb):-1:1
-            if divide(mon(sgb[i],1), mon(redf,r),A) && lt(so,mul(mon(redf,r)/mon(sgb[i],1), sgb[i].sig), redf.sig)
+            if divide(mon(sgb[i],1), mon(res,r),A) && lt(so,mul(mon(res,r)/mon(sgb[i],1), sgb[i].sig), res.sig)
                 div = true
-                reduce!(redf,r, sgb[i], A)
+                res = reduce!(res,r, sgb[i], A)
                 globalstats.counters[:f5_number_divisions]+=1
                 break
             end
@@ -75,7 +76,7 @@ function sigdiv!(redf :: SigPair, sgb :: Vector{SigPair{N,T,M}}, so :: SigOrder,
         end
 
     end
-    return divhappened  
+    return res, divhappened  
 end
 
 # Reduce mon r of pol f with pol g 
@@ -86,10 +87,10 @@ function reduce!(f :: SigPair, r :: Int, g :: SigPair, A :: OreAlg)
     np = OrePoly([thecoeff],[themon])
     np=mul(np, g.op, A)
     globalstats.counters[:f5_field_operations] += length(np)
-    add!(f.op, np, A)
     if ctx(A) isa RatFunCtx
-        globalstats.counters[:f5_size_coeff] += length(numerator(thecoeff)) + length(Nemo.denominator(thecoeff))
+        globalstats.counters[:f5_size_coeff] += length(numerator(thecoeff,false)) + length(Nemo.denominator(thecoeff,false))
     end
+    return SigPair(add!(f.op, np, A),f.sig)
 end
 
 function delete_op_with_T!(v :: Vector{SigPair{N, C, M}},:: OreAlg) where {N,C,M}
@@ -110,7 +111,7 @@ function sigbasis(gen :: Vector{OrePoly{K,M}}, A :: OreAlg; stophol :: Bool =fal
     sgb = prebasis(deepcopy(gen))
 
     sigorder = TOP{typeof(order(A))}(order(A))
-    Q = SortedSet(sigorder,Signature{N}[]) # signature queue
+    Q = SortedSet{Signature{N}}(sigorder,Signature{N}[]) # signature queue
 
 
     for i in 1:length(sgb)
@@ -137,7 +138,7 @@ function sigbasis(gen :: Vector{OrePoly{K,M}}, A :: OreAlg; stophol :: Bool =fal
         if length(f) == 0 
             println("zero")
         end
-        divhappened = sigdiv!(f, sgb,sigorder, A)
+        f, divhappened = sigdiv!(f, sgb,sigorder, A)
 
         if divhappened
             if length(f.op) > 0

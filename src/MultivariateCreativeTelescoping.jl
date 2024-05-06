@@ -6,6 +6,8 @@ using Nemo
 using DataStructures
 using ExportAll
 
+using FLINT_jll: libflint
+
 include("globalstats.jl")
 include("primes.jl")
 
@@ -14,6 +16,8 @@ include("TypeOreMonomial.jl")
 include("TypeOrePolynomial.jl")
 include("TypeMonOrder.jl")
 include("TypeOreAlgebra.jl")
+
+include("interface_FLINT.jl")
 
 include("ParseInputOutput.jl")
 include("OrePolyAddMul.jl")

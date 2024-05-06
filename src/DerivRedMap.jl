@@ -35,7 +35,7 @@ function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: Or
     red_dt = find_red_dt(gb,A)
     g1,g2 = separate(gb,A)
     lm_g1 = [mon(g,1) for g in g1]
-    GD_reduction1!(spol,g1,A)
+    spol = GD_reduction1!(spol,g1,A)
     d = maxdegx(spol,A)
     if length(g2) > 0
         tmp =  maximum([maximum([sum(m[i] for i in 2+A.npdv:1+2*A.npdv) - sum(m[i] for i in 2:1+A.npdv) for m in mons(p)]) for p in g2])
@@ -45,7 +45,7 @@ function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: Or
     d = max(d,tmp) + 2
     echelon, next_incr = GD_prereduction_init(g2, g1, d, A)
     lm_ech = SortedSet(order(A),[mon(g,1) for g in echelon])
-    reduce_with_echelon!(echelon,spol,A)
+    spol = reduce_with_echelon!(echelon,spol,A)
     nd = maxdegx(spol,A)
     stairs = SortedSet{M}[]
     # maximal increase in degree when multiplying by dt
@@ -54,8 +54,8 @@ function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: Or
         for i in 1:5
             next_incr = GD_prereduction_increment!(echelon,next_incr,g1,SortedSet{M}(order(A)),A)
         end
-        reduce_with_echelon!(echelon,spol,A)
-        return g1, red_dt, echelon
+        spol = reduce_with_echelon!(echelon,spol,A)
+        return spol,g1, red_dt, echelon
     end
 
     understair = SortedSet{M}(order(A),[makemon(1,A)^i for i in 0:mon(red_dt,1)[1]-1])
@@ -87,8 +87,8 @@ function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: Or
     for i in 1:5
         next_incr = GD_prereduction_increment!(echelon,next_incr,g1,SortedSet{M}(order(A)),A)
     end
-    reduce_with_echelon!(echelon,spol,A)
-    return g1, red_dt, echelon
+    spol = reduce_with_echelon!(echelon,spol,A)
+    return spol, g1, red_dt, echelon
 end
 
 function find_red_dt(g :: Vector{OrePoly{T,M}}, A :: OreAlg) where {T,M}
@@ -111,9 +111,9 @@ function find_der_red_map(spol :: OrePoly, g1 :: Vector{OrePoly{T,M}}, red_dt ::
     while !isempty(toadd)
         m = pop!(toadd)
         dtm = mul(dt,OrePoly([one(ctx(A))],[m]),A)
-        div!(dtm,[red_dt],A)
-        GD_reduction1!(dtm, g1, A)
-        reduce_with_echelon!(echelon, dtm, A)
+        dtm = div!(dtm,[red_dt],A)
+        dtm = GD_reduction1!(dtm, g1, A)
+        dtm = reduce_with_echelon!(echelon, dtm, A)
         im[m] = dtm 
         for m in mons(dtm)
             if !haskey(im,m)
@@ -126,6 +126,6 @@ end
 
 
 function der_red_map(A :: OreAlg, spol :: OrePoly, gb :: Vector{OrePoly{T,M}}) where {T,M}
-    g1, red_dt, echelon = der_red_map_precomp(spol,gb,A)
+    spol, g1, red_dt, echelon = der_red_map_precomp(spol,gb,A)
     return find_der_red_map(spol,g1,red_dt,echelon,A), spol
 end

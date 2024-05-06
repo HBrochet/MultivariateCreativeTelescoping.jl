@@ -30,8 +30,8 @@ Compute a smaller representative of the operator pol w.r.t. the order of A in th
 """
 function representative_in_integral_module(precomp :: RepInIntMod,pol :: OrePoly, A :: OreAlg)
     npol = deepcopy(pol)
-    GD_reduction1!(npol,precomp.g1,A)
-    reduce_with_echelon!(precomp.echelon,npol,A)
+    npol = GD_reduction1!(npol,precomp.g1,A)
+    npol = reduce_with_echelon!(precomp.echelon,npol,A)
     return npol
 end
 
@@ -54,8 +54,8 @@ function GD_prereduction_init(G2 :: Vector{OrePoly{T,M}}, G1 :: Vector{OrePoly{T
         push!(tmpG,g)
         push!(donotadd,mon(g,1))
         newrel = deepcopy(g)
-        GD_reduction1!(newrel,G1,A)
-        reduce_with_echelon!(echelon,newrel,A)
+        newrel = GD_reduction1!(newrel,G1,A)
+        newrel = reduce_with_echelon!(echelon,newrel,A)
         add_echelon!(echelon,newrel,A)
         k = maximum([sum(m[i] for i in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv) - sum(m[i] for i in A.nrdv+1:A.nrdv+A.npdv) for m in mons(g)])
         # println("g")
@@ -92,8 +92,8 @@ function GD_prereduction_increment!(echelon :: Vector{OrePoly{T,M}}, G :: Vector
             push!(newG,deepcopy(newrel))
             push!(donotadd, new_lmon)
 
-            GD_reduction1!(newrel,G1,A)
-            reduce_with_echelon!(echelon,newrel,A)
+            newrel = GD_reduction1!(newrel,G1,A)
+            newrel = reduce_with_echelon!(echelon,newrel,A)
             add_echelon!(echelon,newrel,A)
             if !isnothing(newlm) && length(newrel) > 0 
                 push!(newlm, mon(newrel,1))
@@ -103,7 +103,8 @@ function GD_prereduction_increment!(echelon :: Vector{OrePoly{T,M}}, G :: Vector
     return newG
 end
 
-function reduce_with_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}, A :: OreAlg; augmented = false, echelonvect = Vector{T}[], debug = false) where {T,M}
+function reduce_with_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}, A :: OreAlg; augmented = false, echelonvect = Vector{T}[], debug = false, unitary = true) where {T,M}
+    res = P
     if augmented 
         vect = T[zero(ctx(A)) for i in 1:length(echelon)]
         push!(vect,one(ctx(A)))
@@ -111,8 +112,8 @@ function reduce_with_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}
 
     r = 1 
     e = 1 
-    while r <= length(P)
-        c,m = P[r]
+    while r <= length(res)
+        c,m = res[r]
         div = false
         for i in e:length(echelon)
             if lt(order(A), mon(echelon[i],1), m)
@@ -120,11 +121,18 @@ function reduce_with_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}
                 break
             elseif m == mon(echelon[i],1)
                 div = true
-                @assert coeff(echelon[i],1) == one(ctx(A))
-                sub!(P,mul(c,echelon[i],A),A)
+                if !unitary
+                    mul!(coeff(echelon[i],1),res,A)
+                end
+                res = sub!(res,mul(c,echelon[i],A),A)
                 if augmented 
+                    if !unitary 
+                        for l in 1:length(echelon)+1
+                            vect[l] = mul(coeff(echelon[i],1),vect[l],ctx(A))
+                        end
+                    end
                     for l in 1:length(echelonvect[i])
-                        vect[l] = vect[l] - c * echelonvect[i][l]
+                        vect[l] = sub(vect[l],mul(c,echelonvect[i][l], ctx(A)),ctx(A))
                     end
                 end
                 e = i + 1
@@ -136,24 +144,29 @@ function reduce_with_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}
         end
     end
     if augmented
-        return vect 
+        return res, vect 
     end
+    return res
 end
 
-function add_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}, A :: OreAlg; augmented = false, echelonvect = Vector{T}[], vect = T[] ) where {T,M}
+function add_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}, A :: OreAlg; augmented = false, echelonvect = Vector{T}[], vect = T[],unitary = true ) where {T,M}
     if length(P) == 0
         return 
     end
-    if augmented 
-        for i in 1:length(vect)
-            vect[i] = mul(vect[i], inv(coeff(P,1),ctx(A)),ctx(A))
+    if augmented
+        if unitary
+            for i in 1:length(vect)
+                vect[i] = mul(vect[i], inv(coeff(P,1),ctx(A)),ctx(A))
+            end
         end
 
         for v in echelonvect 
             push!(v, zero(ctx(A)))
         end
     end
-    makemonic!(P,A)
+    if unitary
+        makemonic!(P,A)
+    end
     for i in length(echelon):-1:1 
         if lt(order(A),mon(P,1),mon(echelon[i],1))
             insert!(echelon,i+1,P)
@@ -196,7 +209,7 @@ function GD_reduction1!(pol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}},A :: Ore
         for i in 1:length(gb)
             if divide(mon(gb[i],1), mon(pol,r),A)
                 div = true
-                reduce!(pol,r, gb[i], A)
+                pol = reduce!(pol,r, gb[i], A)
                 mod_derivatives!(pol,A)
                 break
             end
@@ -205,6 +218,7 @@ function GD_reduction1!(pol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}},A :: Ore
             r = r + 1
         end
     end
+    return pol
 end
 
 function separate(gb :: Vector{OrePoly{T,M}}, A::OreAlg) where {T, M}

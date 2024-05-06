@@ -76,7 +76,13 @@ convert(T :: Integer,ctx :: Nmod32Γ) = UInt32(T)
     end
 end
 
+function opp(a::UInt32, ctx::Nmod32Γ)
+    return ctx.char - a
+end
 
+@inline function sub(a::UInt32, b::UInt32, ctx::Nmod32Γ)
+    return add(a,opp(b,ctx),ctx)
+end
 @inline function addmul(a::UInt64, b::UInt32, c::UInt32,ctx::Nmod32Γ)
     z0 = a + UInt64(b)*UInt64(c)
     z1 = z0 - ctx.maxshift
@@ -94,9 +100,7 @@ end
     return z
 end
 
-function opp(a::UInt32, ctx::Nmod32Γ)
-    return ctx.char - a
-end
+
 
 function inv(a::UInt32, ctx::Nmod32Γ)
     invmod(UInt64(a), UInt64(ctx.char)) % UInt32
@@ -171,15 +175,114 @@ function normal(ctx::Nmod32xΓ, a::UInt128)
 end
 
 
+#. Univariate rational functions
+abstract type RatFunCtx{T,TT} <: NmodLikeΓ{T, TT} end
+abstract type UnivRatFunCtx{T,TT} <: RatFunCtx{T,TT} end
+
+#. ratfun mod small p 
+
+const UnivRatFunModp = Generic.FracFieldElem{fpPolyRingElem}
+
+struct UnivRatFunModpCtx <: UnivRatFunCtx{UnivRatFunModp, UnivRatFunModp}
+    F :: Generic.FracField{Nemo.fpPolyRingElem}
+    R :: fpPolyRing
+    vars :: Vector{fpPolyRingElem}
+    char :: Int  
+end
+
+opp(a :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = - a
+add(a :: UnivRatFunModp, b :: UnivRatFunModp, ctx ::UnivRatFunModpCtx) = a + b 
+sub(a :: UnivRatFunModp, b :: UnivRatFunModp, ctx ::UnivRatFunModpCtx) = a - b 
+mul(a :: UnivRatFunModp, b :: UnivRatFunModp, ctx ::UnivRatFunModpCtx) = a * b 
+inv(a :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = 1/a 
+submul(a :: UnivRatFunModp, b :: UnivRatFunModp, c :: UnivRatFunModp, ctx ::UnivRatFunModpCtx) = a - b * c 
+normal(a :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = a 
+inflate(a :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = a 
+deflate(a :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = a 
+convert(a :: Integer, ctx :: UnivRatFunModpCtx) = ctx.F(a)
+convertn(a :: Integer, ctx :: UnivRatFunModpCtx) = ctx.F(a)
+
+Base.one(ctx :: UnivRatFunModpCtx) = ctx.F(1)
+Base.zero(x :: T, ctx :: UnivRatFunModpCtx) where T = ctx.F(0)
+Base.zero(ctx :: UnivRatFunModpCtx) = ctx.F(0)
+
+Base.iszero(x :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = x == ctx.F(0)
+Base.isone(x :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = x == ctx.F(1)
+
+function evaluate(a :: UnivRatFunModp, p :: Int) 
+    return Nemo.evaluate(Nemo.numerator(a,false),p)//Nemo.evaluate(Nemo.denominator(a,false),p)
+end
+
+# ratfun mod large p 
+
+const UnivRatFunModP = Generic.FracFieldElem{FpPolyRingElem}
+
+struct UnivRatFunModPCtx <: UnivRatFunCtx{UnivRatFunModP, UnivRatFunModP}
+    F :: Generic.FracField{Nemo.FpPolyRingElem}
+    R :: FpPolyRing
+    vars :: Vector{FpPolyRingElem}
+    char :: Int  
+end
+
+opp(a :: UnivRatFunModP, ctx :: UnivRatFunModPCtx) = - a
+add(a :: UnivRatFunModP, b :: UnivRatFunModP, ctx ::UnivRatFunModPCtx) = a + b 
+sub(a :: UnivRatFunModP, b :: UnivRatFunModP, ctx ::UnivRatFunModPCtx) = a - b 
+mul(a :: UnivRatFunModP, b :: UnivRatFunModP, ctx ::UnivRatFunModPCtx) = a * b 
+inv(a :: UnivRatFunModP, ctx :: UnivRatFunModPCtx) = 1/a 
+submul(a :: UnivRatFunModP, b :: UnivRatFunModP, c :: UnivRatFunModP, ctx ::UnivRatFunModPCtx) = a - b * c 
+normal(a :: UnivRatFunModP, ctx :: UnivRatFunModPCtx) = a 
+inflate(a :: UnivRatFunModP, ctx :: UnivRatFunModPCtx) = a 
+deflate(a :: UnivRatFunModP, ctx :: UnivRatFunModPCtx) = a 
+convert(a :: Integer, ctx :: UnivRatFunModPCtx) = ctx.F(a)
+convertn(a :: Integer, ctx :: UnivRatFunModPCtx) = ctx.F(a)
+
+Base.one(ctx :: UnivRatFunModPCtx) = ctx.F(1)
+Base.zero(x :: T, ctx :: UnivRatFunModPCtx) where T = ctx.F(0)
+Base.zero(ctx :: UnivRatFunModPCtx) = ctx.F(0)
+
+Base.iszero(x :: UnivRatFunModP, ctx :: UnivRatFunModPCtx) = x == ctx.F(0)
+Base.isone(x :: UnivRatFunModP, ctx :: UnivRatFunModPCtx) = x == ctx.F(1)
+
+##
+const UnivRatFunQQ = Generic.FracFieldElem{ZZPolyRingElem}
+
+struct UnivRatFunQQCtx <: UnivRatFunCtx{UnivRatFunQQ,UnivRatFunQQ}
+    F :: Generic.FracField{ZZPolyRingElem}
+    R :: ZZPolyRing
+    vars :: Vector{ZZPolyRingElem}
+    char :: Int
+    UnivRatFunQQCtx(F,R,v) = new(F,R,v,0)
+end
+
+opp(a :: UnivRatFunQQ, ctx :: UnivRatFunQQCtx) = - a
+add(a :: UnivRatFunQQ, b :: UnivRatFunQQ, ctx ::UnivRatFunQQCtx) = a + b 
+sub(a :: UnivRatFunQQ, b :: UnivRatFunQQ, ctx ::UnivRatFunQQCtx) = a - b 
+mul(a :: UnivRatFunQQ, b :: UnivRatFunQQ, ctx ::UnivRatFunQQCtx) = a * b 
+inv(a :: UnivRatFunQQ, ctx :: UnivRatFunQQCtx) = 1/a 
+submul(a :: UnivRatFunQQ, b :: UnivRatFunQQ, c :: UnivRatFunQQ, ctx ::UnivRatFunQQCtx) = a - b * c 
+normal(a :: UnivRatFunQQ, ctx :: UnivRatFunQQCtx) = a 
+inflate(a :: UnivRatFunQQ, ctx :: UnivRatFunQQCtx) = a 
+deflate(a :: UnivRatFunQQ, ctx :: UnivRatFunQQCtx) = a 
+convert(a :: Int, ctx :: UnivRatFunQQCtx) = ctx.F(a)
+convertn(a :: Integer, ctx :: UnivRatFunQQCtx) = ctx.F(a)
+
+Base.one(ctx :: UnivRatFunQQCtx) = ctx.F(1)
+Base.zero(x :: T, ctx :: UnivRatFunQQCtx) where T = ctx.F(0)
+Base.zero(ctx :: UnivRatFunQQCtx) = ctx.F(0)
+
+Base.iszero(x :: UnivRatFunQQ, ctx :: UnivRatFunQQCtx) = x == ctx.F(0)
+Base.isone(x :: UnivRatFunQQ, ctx :: UnivRatFunQQCtx) = x == ctx.F(1)
+
+
 
 #. Multivariate rational functions
-abstract type RatFunCtx{T,TT} <: NmodLikeΓ{T, TT} end
+abstract type MRatFunCtx{T,TT} <: RatFunCtx{T,TT}  end
 
 #. ratfun mod small p 
 
 const RatFunModp = Generic.FracFieldElem{fpMPolyRingElem}
 
-struct RatFunModpCtx <: RatFunCtx{RatFunModp, RatFunModp}
+struct RatFunModpCtx <: MRatFunCtx{RatFunModp, RatFunModp}
     F :: Generic.FracField{Nemo.fpMPolyRingElem}
     R :: fpMPolyRing
     vars :: Vector{fpMPolyRingElem}
@@ -188,6 +291,7 @@ end
 
 opp(a :: RatFunModp, ctx :: RatFunModpCtx) = - a
 add(a :: RatFunModp, b :: RatFunModp, ctx ::RatFunModpCtx) = a + b 
+sub(a :: RatFunModp, b :: RatFunModp, ctx ::RatFunModpCtx) = a - b 
 mul(a :: RatFunModp, b :: RatFunModp, ctx ::RatFunModpCtx) = a * b 
 inv(a :: RatFunModp, ctx :: RatFunModpCtx) = 1/a 
 submul(a :: RatFunModp, b :: RatFunModp, c :: RatFunModp, ctx ::RatFunModpCtx) = a - b * c 
@@ -208,7 +312,7 @@ Base.isone(x :: RatFunModp, ctx :: RatFunModpCtx) = x == ctx.F(1)
 
 const RatFunModP = Generic.FracFieldElem{FpMPolyRingElem}
 
-struct RatFunModPCtx <: RatFunCtx{RatFunModP, RatFunModP}
+struct RatFunModPCtx <: MRatFunCtx{RatFunModP, RatFunModP}
     F :: Generic.FracField{Nemo.FpMPolyRingElem}
     R :: FpMPolyRing
     vars :: Vector{FpMPolyRingElem}
@@ -217,6 +321,7 @@ end
 
 opp(a :: RatFunModP, ctx :: RatFunModPCtx) = - a
 add(a :: RatFunModP, b :: RatFunModP, ctx ::RatFunModPCtx) = a + b 
+sub(a :: RatFunModP, b :: RatFunModP, ctx ::RatFunModPCtx) = a - b 
 mul(a :: RatFunModP, b :: RatFunModP, ctx ::RatFunModPCtx) = a * b 
 inv(a :: RatFunModP, ctx :: RatFunModPCtx) = 1/a 
 submul(a :: RatFunModP, b :: RatFunModP, c :: RatFunModP, ctx ::RatFunModPCtx) = a - b * c 
@@ -236,7 +341,7 @@ Base.isone(x :: RatFunModP, ctx :: RatFunModPCtx) = x == ctx.F(1)
 ##
 const RatFunQQ = Generic.FracFieldElem{ZZMPolyRingElem}
 
-struct RatFunQQCtx <: RatFunCtx{RatFunQQ,RatFunQQ}
+struct RatFunQQCtx <: MRatFunCtx{RatFunQQ,RatFunQQ}
     F :: Generic.FracField{ZZMPolyRingElem}
     R :: ZZMPolyRing
     vars :: Vector{ZZMPolyRingElem}
@@ -246,6 +351,7 @@ end
 
 opp(a :: RatFunQQ, ctx :: RatFunQQCtx) = - a
 add(a :: RatFunQQ, b :: RatFunQQ, ctx ::RatFunQQCtx) = a + b 
+sub(a :: RatFunQQ, b :: RatFunQQ, ctx ::RatFunQQCtx) = a - b 
 mul(a :: RatFunQQ, b :: RatFunQQ, ctx ::RatFunQQCtx) = a * b 
 inv(a :: RatFunQQ, ctx :: RatFunQQCtx) = 1/a 
 submul(a :: RatFunQQ, b :: RatFunQQ, c :: RatFunQQ, ctx ::RatFunQQCtx) = a - b * c 
@@ -272,6 +378,7 @@ end
 
 opp(a :: QQFieldElem, ctx :: QQCtx) = - a
 add(a :: QQFieldElem, b :: QQFieldElem, ctx ::QQCtx) = a + b 
+sub(a :: QQFieldElem, b :: QQFieldElem, ctx ::QQCtx) = a - b 
 mul(a :: QQFieldElem, b :: QQFieldElem, ctx ::QQCtx) = a * b 
 inv(a :: QQFieldElem, ctx :: QQCtx) = 1/a 
 submul(a :: QQFieldElem, b :: QQFieldElem, c :: QQFieldElem, ctx ::QQCtx) = a - b * c 

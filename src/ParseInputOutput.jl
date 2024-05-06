@@ -35,7 +35,11 @@ function expr_to_OreAlg(expr :: Symbol, A :: OreAlg)
 end
 
 function expr_to_OreAlg(expr :: Number, A :: OreAlg)
-    return makepoly(convertn(expr,ctx(A)),makemon(-1,A))
+    c = convertn(expr,ctx(A))
+    if iszero(c,ctx(A))
+        return zero(A)
+    end
+    return makepoly(c,makemon(-1,A))
 end
 
 
@@ -76,7 +80,7 @@ function expr_to_OreAlg_call(expr :: Expr, A :: OreAlg)
     # there are only 3 arguments for the latter cases
     b = expr_to_OreAlg(expr.args[3],A)
     if op == :- 
-        sub!(a,b,A)
+        a = sub!(a,b,A)
         return a
     elseif op == :/ || op == ://
         #b should be a constant
@@ -86,17 +90,21 @@ function expr_to_OreAlg_call(expr :: Expr, A :: OreAlg)
         #b should be an integer
         powa = deepcopy(a)
         bound = coeff(b,1)
-        if bound isa RatFunQQ || bound isa RatFunModp || bound isa RatFunModP
+        if bound isa RatFunQQ || bound isa RatFunModp || bound isa RatFunModP || bound isa UnivRatFunQQ || bound isa UnivRatFunModp || bound isa UnivRatFunModP 
             if is_zero(bound)
                 bound = 0
             else 
-                bound = Nemo.coeff(numerator(bound),1)
+                if bound isa RatFunQQ || bound isa RatFunModp || bound isa RatFunModP
+                    bound = Nemo.coeff(numerator(bound,false),1)
+                else 
+                    bound = constant_coefficient(numerator(bound,false))
+                end
             end
         end 
         if bound isa ZZRingElem
             bound = bound.d
         elseif bound isa QQFieldElem
-            bound = numerator(bound)
+            bound = numerator(bound,false)
         elseif bound isa fpFieldElem
             bound = bound.data
         elseif !(bound isa Integer) # à changer
@@ -161,6 +169,13 @@ function prettyprint(v :: Vector{Vector{OrePoly{K,M}}},A :: OreAlg) where {K,M}
         prettyprint(v[i],A)
     end
 
+end
+
+function prettyprint(d :: Dict{M,OrePoly{K,M}},A :: OreAlg) where {K,M}
+    println("dictionary of ", length(d), " OrePoly")
+    for k in keys(d)
+        prettyprint(d[k],A)
+    end
 end
 
 

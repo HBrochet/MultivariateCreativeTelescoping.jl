@@ -129,3 +129,16 @@ end
 end
 
 
+@testset begin 
+    A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]), poldiffvars=(["x"],["dx"]),char=primes[1])
+
+    p = parse_OrePoly("t",A)
+
+    function foo(A::OreAlg,p :: OrePoly)
+        cs = [mul(c,c,ctx(A)) for c in coeffs(p)]
+        return OrePoly(cs,deepcopy(mons(p)))
+    end
+    
+    res = compute_with_cauchy_interpolation(foo,A,p,many=true)
+    @test res == parse_OrePoly("t^2",A)
+end

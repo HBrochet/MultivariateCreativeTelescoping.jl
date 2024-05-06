@@ -7,7 +7,7 @@ function ann_inv_pol(p :: OrePoly{K,M},A :: OreAlg) where {K,M}
     indT = A.nrdv + A.npdv*2 + A.npv + 1
     T = makepoly(one(ctx(A)),makemon(indT,A))
     rel = mul(p,T,A)
-    sub!(rel,one(A),A)
+    rel = sub!(rel,one(A),A)
     push!(g,rel)
     return saturation(g,indT,A)
 end
