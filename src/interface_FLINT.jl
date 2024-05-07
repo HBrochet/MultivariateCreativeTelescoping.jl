@@ -10,13 +10,18 @@ function evaluate(pol :: fpPolyRingElem, v:: Vector{UInt})
     return res
 end
 
-function evaluate_many(r :: Generic.FracFieldElem{fpPolyRingElem}, v :: Vector{UInt})
-    num = Nemo.numerator(r,false)
-    den = Nemo.denominator(r,false)
-
-    evnum = evaluate(num,v)
-    evden = evaluate(den,v)
-    return evnum,evden
+function evaluate_many(r :: Generic.FracFieldElem{fpPolyRingElem}, v :: Vector{UInt};denisone :: Val{T} = Val(false)) where T
+    if T
+        num = Nemo.numerator(r,false)
+        evnum = evaluate(num,v)
+        return evnum 
+    else
+        den = Nemo.denominator(r,false)
+        num = Nemo.numerator(r,false)
+        evnum = evaluate(num,v)
+        evden = evaluate(den,v)
+        return evnum,evden
+    end
 end
 
 

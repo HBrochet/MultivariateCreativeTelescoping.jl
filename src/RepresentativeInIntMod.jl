@@ -103,12 +103,8 @@ function GD_prereduction_increment!(echelon :: Vector{OrePoly{T,M}}, G :: Vector
     return newG
 end
 
-function reduce_with_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}, A :: OreAlg; augmented = false, echelonvect = Vector{T}[], debug = false, unitary = true) where {T,M}
+function reduce_with_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}, A :: OreAlg) where {T,M}
     res = P
-    if augmented 
-        vect = T[zero(ctx(A)) for i in 1:length(echelon)]
-        push!(vect,one(ctx(A)))
-    end
 
     r = 1 
     e = 1 
@@ -121,19 +117,37 @@ function reduce_with_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}
                 break
             elseif m == mon(echelon[i],1)
                 div = true
-                if !unitary
-                    mul!(coeff(echelon[i],1),res,A)
-                end
                 res = sub!(res,mul(c,echelon[i],A),A)
-                if augmented 
-                    if !unitary 
-                        for l in 1:length(echelon)+1
-                            vect[l] = mul(coeff(echelon[i],1),vect[l],ctx(A))
-                        end
-                    end
-                    for l in 1:length(echelonvect[i])
-                        vect[l] = sub(vect[l],mul(c,echelonvect[i][l], ctx(A)),ctx(A))
-                    end
+                e = i + 1
+                break
+            end
+        end
+        if !div
+            r += 1
+        end
+    end
+    return res
+end
+
+function reduce_with_echelon_augmented!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}, A :: OreAlg, echelonvect :: Vector{Vector{T}}) where {T,M}
+    res = P
+    vect = T[zero(ctx(A)) for i in 1:length(echelon)]
+    push!(vect,one(ctx(A)))
+
+    r = 1 
+    e = 1 
+    while r <= length(res)
+        c,m = res[r]
+        div = false
+        for i in e:length(echelon)
+            if lt(order(A), mon(echelon[i],1), m)
+                e = i 
+                break
+            elseif m == mon(echelon[i],1)
+                div = true
+                res = sub!(res,mul(c,echelon[i],A),A)
+                for l in 1:length(echelonvect[i])
+                    vect[l] = sub(vect[l],mul(c,echelonvect[i][l], ctx(A)),ctx(A))
                 end
                 e = i + 1
                 break
@@ -143,11 +157,9 @@ function reduce_with_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}
             r += 1
         end
     end
-    if augmented
-        return res, vect 
-    end
-    return res
+    return res, vect 
 end
+
 
 function add_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}, A :: OreAlg; augmented = false, echelonvect = Vector{T}[], vect = T[],unitary = true ) where {T,M}
     if length(P) == 0

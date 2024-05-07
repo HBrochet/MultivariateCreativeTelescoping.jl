@@ -1,6 +1,6 @@
 function MCT_internal(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg) where {T,M}
     push!(A.nomul,1)
-    der_map, spol = compute_with_cauchy_interpolation(der_red_map, A, spol, gb; many=true)
+    der_map, spol = compute_with_cauchy_interpolation(der_red_map, A, spol, gb)
     # der_map, spol = der_red_map(A, spol, gb)
 
     deleteat!(A.nomul, length(A.nomul))
@@ -51,27 +51,33 @@ function find_LDE(map_ :: Dict{M,OrePoly{T,M}}, spol :: OrePoly{T,M}, A :: OreAl
     end
 end
 
-function find_LDE_by_interpolation(der_map :: Dict{M,OrePoly{T,M}}, spol :: OrePoly{T,M}, A :: OreAlg) where {T,M}
-    rels = find_first_lin_dep_derivatives(der_map,spol,A)
-    # return find_linear_relation(A,rels,A)
-    # return res = find_linear_relation(A,rels,A)
+# function find_LDE_by_interpolation(der_map :: Dict{M,OrePoly{T,M}}, spol :: OrePoly{T,M}, A :: OreAlg) where {T,M}
+#     rels = find_first_lin_dep_derivatives(der_map,spol,A)
+#     # return find_linear_relation(A,rels,A)
+#     # return res = find_linear_relation(A,rels,A)
 
-    res = compute_with_cauchy_interpolation(find_linear_relation,A,rels,A;many=true)
+#     res = compute_with_cauchy_interpolation(find_linear_relation,A,rels,A;many=true)
 
-    dgcd = gcd([Nemo.denominator(c,false) for c in coeffs(res)])
-    ngcd = gcd([Nemo.numerator(c,false) for c in coeffs(res)])
-    println("degree of gcds $(Nemo.degree(ngcd)) $(Nemo.degree(dgcd))")
-    mul!(ctx(A).F(dgcd)/ctx(A).F(ngcd), res, A)
+#     dgcd = gcd([Nemo.denominator(c,false) for c in coeffs(res)])
+#     ngcd = gcd([Nemo.numerator(c,false) for c in coeffs(res)])
+#     println("degree of gcds $(Nemo.degree(ngcd)) $(Nemo.degree(dgcd))")
+#     mul!(ctx(A).F(dgcd)/ctx(A).F(ngcd), res, A)
     
-    return res
-end
+#     return res
+# end
 
 
 function find_LDE_by_interpolation2(der_map :: Dict{M,OrePoly{T,M}}, spol :: OrePoly{T,M}, A :: OreAlg) where {T,M}
-    rels = find_first_lin_dep_derivatives(der_map,spol,A)
+    rels, den = find_first_lin_dep_derivatives(der_map,spol,A)
     mat = mct_op_to_mat(rels, A)
-    # return my_kernel(A,mat)
-    return  compute_with_cauchy_interpolation(my_kernel,A,mat,many=true)
+    res = compute_with_cauchy_interpolation(my_kernel,A,mat,denisone = Val(true))
+    for i in 1:length(res)
+        coeffs(res)[i] = coeffs(res)[i] * ctx(A).F(den)^(mons(res)[i][1]+1)
+    end
+    clear_denominators!(res,A)
+    ngcd = gcd([Nemo.numerator(c,false) for c in coeffs(res)])
+    mul!(1 // ctx(A).F(ngcd), res, A)
+    return res
 end
 
 function mct_op_to_mat(rels :: Vector{OrePoly{T,M}}, A :: OreAlg) where {T,M}
@@ -103,17 +109,27 @@ function find_first_lin_dep_derivatives(map_ :: Dict{M,OrePoly{T,M}}, spol :: Or
     echelon_derivatives = OrePoly{TT,M}[]
     echelonvect = Vector{TT}[]
     ord = 0
+
+    den = denominator(spol,A)
+    for k in keys(map_)
+        den = lcm(den,denominator(map_[k],A))
+    end
+    Fden = ctx(A).F(den)
+    for k in keys(map_)
+        mul!(Fden,map_[k],A)
+    end
+    mul!(Fden,spol,A)
     nrel = spol
     rels = OrePoly{T,M}[]
     while true  
         push!(rels,nrel)
         nrel_red = evaluate_parameter(nrel,point,nA)
-        nrel_red, v = reduce_with_echelon!(echelon_derivatives,nrel_red,nA,augmented = true,echelonvect = echelonvect)
+        nrel_red, v = reduce_with_echelon_augmented!(echelon_derivatives,nrel_red,nA,echelonvect)
         if length(nrel_red) == 0 
-            return rels
+            return rels, Fden
         end
         add_echelon!(echelon_derivatives, nrel_red, nA, augmented = true, echelonvect = echelonvect, vect = v)
-        nrel = compute_next_rel(map_, nrel,A)
+        nrel = compute_next_rel(map_, nrel,Fden,ord,A)
         ord += 1 
     end
 end
@@ -133,16 +149,19 @@ function find_linear_relation(A :: OreAlg, rels :: Vector{OrePoly{T,M}},:: OreAl
     end
 end
 
-function compute_next_rel(map_ :: Dict{M,OrePoly{T,M}}, pol :: OrePoly{T,M}, A :: OreAlg) where {T,M}
+function compute_next_rel(map_ :: Dict{M,OrePoly{T,M}}, pol :: OrePoly{T,M},den ::T,ord::Int, A :: OreAlg) where {T,M}
     cs = deepcopy(coeffs(pol))
     ms = deepcopy(mons(pol))
-
     for i in 1:length(cs)
-        cs[i] = derivative(cs[i])
+        cs[i] = ctx(A).F(derivative(Nemo.numerator(cs[i],false))*den)
     end
     res = OrePoly(cs,ms)
     normalize!(res,A)
-
+    if den != one(ctx(A))
+        cpol = deepcopy(pol)
+        mul!(ctx(A).F(ord+1),cpol,A)
+        res = sub!(res,cpol,A)
+    end
     for (c,m) in pol 
         res = add!(res,mul(c,map_[m],A) ,A)
     end

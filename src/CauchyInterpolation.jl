@@ -10,17 +10,17 @@ function add_rand_point!(vec :: Vector{Int}, p :: Int)
 end
 
 # It assumes that A has only one parameter
-function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;many ::Bool = false)
+
+function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;denisone :: Val{T} = Val(false)) where T 
     randpoints = Int[]
     npoints = 1
     bound = 1 
     succeeded = false
-    let prev_res 
     let prev_cbl
 
     glen = guess_length(args...)
     nA = evaluate_parameter_algebra(1,A) # first argument is not needed unless there are variables T in A
-    vpoints, vargs = evaluate_parameter_many(glen,randpoints,nA,args)
+    vpoints, vargs = evaluate_parameter_many(glen,randpoints,nA,args;denisone=Val(T))
     ev_args = Tuple(vargs[i][1] for i in 1:length(args))
     ev_res = [f(nA,ev_args...)]
     vctr = 2 
@@ -32,7 +32,7 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;m
 
     while true 
         if vctr > glen 
-            vpoints,vargs = evaluate_parameter_many(glen,randpoints,nA,args)
+            vpoints,vargs = evaluate_parameter_many(glen,randpoints,nA,args;denisone=Val(T))
             vctr = 1
         end
         push!(randpoints,vpoints[vctr])
@@ -49,35 +49,21 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;m
         # trying interpolation
         if succeeded 
             @debug "interpolation to reconstruct stable mon set"
-            if many 
-                rcbl = random_cbl(ev_res,nA)
-                cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
-                if Nemo.denominator(cbl,false) == Nemo.denominator(prev_cbl,false)
-                    ev_den = evaluate_parameter_cbl(cbl,randpoints,A)
-                    den = Nemo.denominator(cbl,false)
-                    return cauchy_interpolation_known_den(ev_res, randpoints,ev_den,den, A)
-                end
-                prev_cbl = cbl
-
-            else
-                res = cauchy_interpolation(ev_res, randpoints, A;prd = prd)
-                if prev_res == res
-                    return res 
-                end
-                prev_res = res
-
+            rcbl = random_cbl(ev_res,nA)
+            cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
+            if Nemo.denominator(cbl,false) == Nemo.denominator(prev_cbl,false)
+                ev_den = evaluate_parameter_cbl(cbl,randpoints,A)
+                den = Nemo.denominator(cbl,false)
+                return cauchy_interpolation_known_den(ev_res, randpoints,ev_den,den, A)
             end
+            prev_cbl = cbl
             @debug "reconstructions don't match, trying another point"
             succeeded = false
         elseif npoints == 2^bound + 1
             try 
                 @debug "interpolation to reconstruct stable mon set"
-                if many 
-                    rcbl = random_cbl(ev_res,nA)
-                    prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
-                else
-                    prev_res = cauchy_interpolation(ev_res, randpoints, A;prd = prd)
-                end
+                rcbl = random_cbl(ev_res,nA)
+                prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
                 succeeded = true
                 @debug "success, trying one more point"
             catch 
@@ -101,8 +87,8 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;m
         # end
     end
     end
-    end
 end
+
 
 function cauchy_interpolation(v :: Vector{UInt32}, points :: Vector{Int}, A :: OreAlg; prd ::fpPolyRingElem = Nothing)
     R = base_ring(ctx(A).R) 

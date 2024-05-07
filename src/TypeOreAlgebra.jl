@@ -311,7 +311,10 @@ function diff(pol_ :: OrePoly, ind_ :: Integer, A ::OreAlg)
 end
 
 
-function denominator(p :: OrePoly,:: OreAlg)
+function denominator(p :: OrePoly,A:: OreAlg)
+    if length(p) == 0 
+        return ctx(A).R(1)
+    end
     return lcm([Nemo.denominator(c,false) for c in coeffs(p)])
 end
 

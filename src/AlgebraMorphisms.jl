@@ -340,11 +340,31 @@ end
 
 ### Evaluate the single parameter at many points using multievaluation 
 
-
-function evaluate_parameter_many(glen :: Int, randpoints :: Vector{Int}, nA :: OreAlg, args...)
+# Type unstable !!
+function evaluate_parameter_many(glen :: Int, randpoints :: Vector{Int}, nA :: OreAlg, args...;denisone ::Val{TT}= Val(false)) where TT
     vpoints = new_rand_points(randpoints,Int(char(nA)),glen)
     _vpoints = [UInt(p) for p in vpoints]
-    return vpoints, Tuple(evaluate_parameter_many(arg,_vpoints,nA) for arg in args...)
+    # println(length(args), " ",typeof(args[1]))
+    return vpoints, Tuple(evaluate_parameter_many(arg,_vpoints,nA;denisone=Val(TT)) for arg in args...)
+end
+
+
+function evaluate_parameter_many(glen :: Int, randpoints :: Vector{Int}, nA :: OreAlg, a,b;denisone ::Val{T}= Val(false)) where T
+    vpoints = new_rand_points(randpoints,Int(char(nA)),glen)
+    _vpoints = [UInt(p) for p in vpoints]
+    a = evaluate_parameter_many(a,_vpoints,nA;denisone=Val(T))
+    b = evaluate_parameter_many(b,_vpoints,nA;denisone=Val(T))
+
+    return vpoints, tuple(a,b)
+end
+
+function evaluate_parameter_many(glen :: Int, randpoints :: Vector{Int}, nA :: OreAlg, a,b,c;denisone ::Val{T}= Val(false)) where T
+    vpoints = new_rand_points(randpoints,Int(char(nA)),glen)
+    _vpoints = [UInt(p) for p in vpoints]
+    a = evaluate_parameter_many(a,_vpoints,nA;denisone=Val(T))
+    b = evaluate_parameter_many(b,_vpoints,nA;denisone=Val(T))
+    c = evaluate_parameter_many(c,_vpoints,nA;denisone=Val(T))
+    return vpoints, tuple(a,b,c)
 end
 
 
@@ -361,18 +381,27 @@ function new_rand_points(vec :: Vector{Int}, p :: Int,len :: Int)
     return res
 end
 
-function evaluate_parameter_many(pol :: OrePoly, v :: Vector{UInt}, nA:: OreAlg) 
+
+function evaluate_parameter_many(pol :: OrePoly, v :: Vector{UInt}, nA:: OreAlg; denisone :: Val{B} = Val(false)) where B
     T = eltype_co(nA)
     M = eltype_mo(nA)
-    tmp = Vector{Tuple{Vector{UInt}, Vector{UInt}}}(undef,length(pol))
+    if B 
+        tmp = Vector{Vector{UInt}}(undef,length(pol))
+    else
+        tmp = Vector{Tuple{Vector{UInt}, Vector{UInt}}}(undef,length(pol))
+    end
     for i in 1:length(pol)
-        tmp[i] = evaluate_many(coeff(pol,i),v)
+        tmp[i] = evaluate_many(coeff(pol,i),v,denisone = Val(B))
     end
     res = Vector{OrePoly{T,M}}(undef,length(v))
     for l in 1:length(v)
         cs = Vector{T}(undef,length(pol))
         for i in 1:length(pol)
-            cs[i] = mul(T(tmp[i][1][l]),inv(T(tmp[i][2][l]),ctx(nA)),ctx(nA))
+            if B 
+                cs[i] = convertn(tmp[i][1][l],ctx(nA))
+            else
+                cs[i] = mul(T(tmp[i][1][l]),inv(T(tmp[i][2][l]),ctx(nA)),ctx(nA))
+            end
         end
         res[l] = OrePoly(cs,deepcopy(mons(pol)))
     end
@@ -380,13 +409,12 @@ function evaluate_parameter_many(pol :: OrePoly, v :: Vector{UInt}, nA:: OreAlg)
 end
 
 
-
     
-function evaluate_parameter_many(g :: Vector{OrePoly{TT,M}}, v :: Vector{UInt}, nA :: OreAlg)  where {TT, M}
+function evaluate_parameter_many(g :: Vector{OrePoly{TT,M}}, v :: Vector{UInt}, nA :: OreAlg;denisone ::Val{B} = Val(false))  where {B, M,TT}
     T = eltype_co(nA)
     tmp = Vector{Vector{OrePoly{T,M}}}(undef,length(g))
     for i in 1:length(g)
-        tmp[i] = evaluate_parameter_many(g[i],v,nA)
+        tmp[i] = evaluate_parameter_many(g[i],v,nA,denisone=Val(B))
     end
     res = Vector{Vector{OrePoly{T,M}}}(undef,length(v))
     for l in 1:length(v)
@@ -399,11 +427,11 @@ function evaluate_parameter_many(g :: Vector{OrePoly{TT,M}}, v :: Vector{UInt}, 
     return res
 end
 
-function evaluate_parameter_many(d :: Dict{M,OrePoly{TT,M}}, v :: Vector{UInt}, nA :: OreAlg)  where {TT, M}
+function evaluate_parameter_many(d :: Dict{M,OrePoly{TT,M}}, v :: Vector{UInt}, nA :: OreAlg;denisone ::Val{B}= Val(false))  where {TT, M,B}
     T = eltype_co(nA)
     tmp = Dict{M,Vector{OrePoly{T,M}}}()
     for k in keys(d)
-        tmp[k] = evaluate_parameter_many(d[k],v,nA)
+        tmp[k] = evaluate_parameter_many(d[k],v,nA,denisone=Val(B))
     end
     res = Vector{Dict{M,OrePoly{T,M}}}(undef,length(v))
     for l in 1:length(v)
@@ -415,16 +443,20 @@ function evaluate_parameter_many(d :: Dict{M,OrePoly{TT,M}}, v :: Vector{UInt}, 
     end
     return res
 end
-    
 
-function evaluate_parameter_many(mat :: Generic.MatSpaceElem{Generic.FracFieldElem{Nemo.fpPolyRingElem}}, v :: Vector{UInt}, nA :: OreAlg)
+#rendu ici 
+function evaluate_parameter_many(mat :: Generic.MatSpaceElem{Generic.FracFieldElem{Nemo.fpPolyRingElem}}, v :: Vector{UInt}, nA :: OreAlg;denisone ::Val{T}= Val(false)) where T
     nc = number_of_columns(mat)
     nr = number_of_rows(mat)
 
-    tmp = Matrix{Tuple{Vector{UInt}, Vector{UInt}}}(undef,nr,nc)
+    if T 
+        tmp = Matrix{Vector{UInt}}(undef,nr,nc)
+    else
+        tmp = Matrix{Tuple{Vector{UInt}, Vector{UInt}}}(undef,nr,nc)
+    end
     for j in 1:nc
         for i in 1:nr 
-            tmp[i,j] = evaluate_many(mat[i,j],v)
+            tmp[i,j] = evaluate_many(mat[i,j],v;denisone=Val(T))
         end
     end
 
@@ -436,14 +468,17 @@ function evaluate_parameter_many(mat :: Generic.MatSpaceElem{Generic.FracFieldEl
         evmat = M()
         for j in 1:nc
             for i in 1:nr 
-                evmat[i,j] = S(tmp[i,j][1][l]) //  S(tmp[i,j][2][l])
+                if T 
+                    evmat[i,j] = S(tmp[i,j][l])
+                else
+                    evmat[i,j] = S(tmp[i,j][1][l]) //  S(tmp[i,j][2][l])
+                end 
             end
         end
         res[l] = evmat
     end
     return res
 end
-
 
 # function evaluate_parameter(g :: Vector{Vector{OrePoly{T,M}}}, point :: Int,  A :: OreAlg) where  {T,M}
 #     return [evaluate_parameter(a, point, A) for a in g]
