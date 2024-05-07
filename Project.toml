@@ -10,10 +10,7 @@ DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 ExportAll = "ad2082ca-a69e-11e9-38fa-e96309a31fe4"
 FLINT_jll = "e134572f-a0d5-539d-bddf-3cad8db41a82"
 Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
-ProfileCanvas = "efd6af41-a80b-495e-886c-e51b0c7d77a3"
-ProfileSVG = "132c30aa-f267-4189-9183-c8a63c7e05e6"
 ProfileView = "c46f51b8-102a-5cf2-8d2c-8597cb0e0da7"
-StatProfilerHTML = "a8a75453-ed82-57c9-9e16-4cd1196ecbf5"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
