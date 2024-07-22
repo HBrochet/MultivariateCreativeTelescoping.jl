@@ -14,7 +14,7 @@ end
 function updateQ!(Q :: SortedSet, sgb :: Vector{SigPair{N,T,M}}, 
                     g :: SigPair{N,T,M}, sorder :: SigOrder, A :: OreAlg) where {N, T, M}
     for i in 1:length(sgb)
-        if !iscompatible(sgb[i],g,A)
+        if !iscompatible(mon(sgb[i],1),mon(g,1),A)
             continue
         end
         thelcm = lcm(mon(sgb[i],1), mon(g,1))
@@ -45,13 +45,11 @@ end
 
 function selectreductant(sgb :: Vector{SigPair{N,T,M}},sigma :: Signature{N},A :: OreAlg) where {T,M,N}
     for i in length(sgb):-1:1
-        if divide(sgb[i].sig,sigma,A)
+        if iscompatible(sgb[i].sig,sigma,A) && divide(sgb[i].sig,sigma,A)
             mon = sigma.mon/sgb[i].sig.mon
             return mul(mon, sgb[i], A)
         end
     end
-    # prettyprint(sigma,A)
-    # prettyprint(sgb,A)
 end
 
 
@@ -62,7 +60,7 @@ function sigdiv!(redf :: SigPair, sgb :: Vector{SigPair{N,T,M}}, so :: SigOrder,
     while r <= length(res.op)
         div = false
         for i in length(sgb):-1:1
-            if divide(mon(sgb[i],1), mon(res,r),A) && lt(so,mul(mon(res,r)/mon(sgb[i],1), sgb[i].sig), res.sig)
+            if iscompatible(mon(sgb[i],1), mon(res,r),A) && divide(mon(sgb[i],1), mon(res,r),A) && lt(so,mul(mon(res,r)/mon(sgb[i],1), sgb[i].sig), res.sig)
                 div = true
                 res = reduce!(res,r, sgb[i], A)
                 globalstats.counters[:f5_number_divisions]+=1
@@ -126,7 +124,7 @@ function sigbasis(gen :: Vector{OrePoly{K,M}}, A :: OreAlg; stophol :: Bool =fal
         @debug "size of the signature queue: $(length(Q))"
         sig = pop!(Q)
         globalstats.counters[:f5_candidate_signatures] += 1
-        @debug "dealing with signature: $(sig)"
+        @debug "dealing with signature: $((sig.ind,sig.mon.exp))"
         f = selectreductant(sgb,sig,A)
 
         if isnothing(f)

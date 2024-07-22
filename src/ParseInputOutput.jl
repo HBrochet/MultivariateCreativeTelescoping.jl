@@ -178,6 +178,21 @@ function prettyprint(d :: Dict{M,OrePoly{K,M}},A :: OreAlg) where {K,M}
     end
 end
 
+function prettyprint(s :: SortedSet{M}, A::OreAlg) where M
+    println("SortedSet of $(length(s)) elements")
+    for m in s 
+        printmon(m,A)
+        println()
+    end
+end
+
+function prettyprint(v :: Vector{SortedSet{M}}, A::OreAlg) where M
+    println("Vector of SortedSet of $(length(v)) elements")
+    for s in v 
+        prettyprint(s,A)        
+        println()
+    end
+end
 
 function mystring(m :: OreMonVE{N,E}, A :: OreAlg) where {N,E}
     s = "" 

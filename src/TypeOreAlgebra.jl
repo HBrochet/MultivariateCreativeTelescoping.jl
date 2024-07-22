@@ -362,7 +362,7 @@ function isholonomic(gb :: Vector{OrePoly{T,M}},A :: Alg) where {T,M, Alg <:OreA
             end
         end
         if !gfound 
-            # println(subset)
+            println("s ",subset)
             return false
         end
     end

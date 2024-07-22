@@ -40,9 +40,10 @@ function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: Or
     if length(g2) > 0
         tmp =  maximum([maximum([sum(m[i] for i in 2+A.npdv:1+2*A.npdv) - sum(m[i] for i in 2:1+A.npdv) for m in mons(p)]) for p in g2])
     else
-        tmp = 0
+        return spol, g1, red_dt, OrePoly{T,M}[]
     end
     d = max(d,tmp) + 2
+    t = time()
     echelon, next_incr = GD_prereduction_init(g2, g1, d, A)
     lm_ech = SortedSet(order(A),[mon(g,1) for g in echelon])
     spol = reduce_with_echelon!(echelon,spol,A)
@@ -60,18 +61,21 @@ function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: Or
 
     understair = SortedSet{M}(order(A),[makemon(1,A)^i for i in 0:mon(red_dt,1)[1]-1])
     push!(stairs, SortedSet{M}(order(A)))
+
     for i in 1:nd
         understair, _ = next_slice(understair, lm_g1, lm_ech, A)
         push!(stairs, SortedSet{M}(order(A)))
     end
 
+    t = time()
     for i in nd+1:d
         understair, irred = next_slice(understair, lm_g1, lm_ech, A)
         push!(stairs, SortedSet{M}(order(A),irred))
     end
 
     itt = 0
-    while true
+    t = time()
+    while !termination_criterion_der_red_map_precomp(stairs,nd,l)
         itt += 1
         newlm = SortedSet{M}(order(A))
         next_incr = GD_prereduction_increment!(echelon,next_incr,g1,SortedSet{M}(order(A)),A;newlm = newlm)
@@ -79,15 +83,22 @@ function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: Or
         understair, irred = next_slice(understair, lm_g1, lm_ech, A)
         push!(stairs,SortedSet{M}(order(A),irred))
         update_stairs!(stairs,newlm,nd,A)
-        if termination_criterion_der_red_map_precomp(stairs,nd,l)
-            break
-        end
+        # if itt == 15
+        #     prettyprint(stairs,A)
+        #     println(sum(mon(echelon[1],1).exp)," ", sum(mon(echelon[end],1).exp), " ",length(echelon))
+        #     println(nd)
+        #     println(l)
+        #     prettyprint(next_incr,A)
+        #     error("fin")
+        # end
     end
+    
     ## bonus for minimality 
-    for i in 1:5
-        next_incr = GD_prereduction_increment!(echelon,next_incr,g1,SortedSet{M}(order(A)),A)
-    end
+    # for i in 1:5
+    #     next_incr = GD_prereduction_increment!(echelon,next_incr,g1,SortedSet{M}(order(A)),A)
+    # end
     spol = reduce_with_echelon!(echelon,spol,A)
+    # error("fin")
     return spol, g1, red_dt, echelon
 end
 

@@ -30,8 +30,12 @@ function Base.length(s :: SigPair)
     return length(s.op)
 end
 
-function iscompatible(a :: SigPair, b :: SigPair, A:: OreAlg)
-    return iscompatible(mon(a,1),mon(b,1),A)
+# function iscompatible(a :: SigPair, b :: SigPair, A:: OreAlg)
+#     return iscompatible(mon(a,1),mon(b,1),A)
+# end
+
+function iscompatible(a :: Signature, b :: Signature, A:: OreAlg)
+    return iscompatible(a.mon,b.mon,A)
 end
 
 
