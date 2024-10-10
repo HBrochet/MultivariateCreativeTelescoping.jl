@@ -5,7 +5,6 @@ MultivariateCreativeTelescoping is a package to compute linear differential equa
 
 This algorithm is dedicated to integrals with natural boundaries of the form: 
 $$I(t) = \int f(t, \boldsymbol{x}) \boldsymbol{dx}$$
-
 where $\boldsymbol{x}=(x_1,\dots,x_n)$ and $f$ is a D-finite/holonomic function that satisfies PDEs with coefficients in $\mathbb{Q}(t,\boldsymbol{x})$.
 
 
