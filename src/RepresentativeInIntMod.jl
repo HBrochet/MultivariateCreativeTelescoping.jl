@@ -83,7 +83,7 @@ function GD_prereduction_increment!(echelon :: Vector{OrePoly{T,M}}, G :: Vector
 
             # second criterion 
             for h in G1 
-                if divide(mon(h,1),new_lmon,A)
+                if divide(mon(h,1),new_lmon)
                     @goto next_it
                 end
             end

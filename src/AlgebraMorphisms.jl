@@ -98,8 +98,8 @@ function change_alg_char_ratfun(prime_ :: Integer, A :: OreAlg)
     tmpA = OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
                                                                 A.indexp_to_strvar,
                                                                 ev_ratvars,                                                               
-                                                                A.rvars_to_int,
-                                                                A.int_to_rvars,
+                                                                A.drvars_to_int,
+                                                                A.int_to_drvars,
                                                                 A.nrdv,
                                                                 A.npdv,
                                                                 A.npv,
@@ -109,6 +109,7 @@ function change_alg_char_ratfun(prime_ :: Integer, A :: OreAlg)
                                                                 A.nomul,
                                                                 A.order,
                                                                 nctx,
+                                                                A.varord,
                                                                 A.inp)
 
     pl = [change_coefficient_field(CRing,p,tmpA) for p in A.pols_loc]
@@ -117,8 +118,8 @@ function change_alg_char_ratfun(prime_ :: Integer, A :: OreAlg)
     return OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
                                                                 A.indexp_to_strvar,
                                                                 ev_ratvars,                                                               
-                                                                A.rvars_to_int,
-                                                                A.int_to_rvars,
+                                                                A.drvars_to_int,
+                                                                A.int_to_drvars,
                                                                 A.nrdv,
                                                                 A.npdv,
                                                                 A.npv,
@@ -128,6 +129,7 @@ function change_alg_char_ratfun(prime_ :: Integer, A :: OreAlg)
                                                                 A.nomul,
                                                                 A.order,
                                                                 nctx,
+                                                                A.varord,
                                                                 A.inp)
 end
 
@@ -145,8 +147,8 @@ function change_alg_char_QQ(prime :: Integer, A :: OreAlg)
     tmpA = OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
                                                                 A.indexp_to_strvar,
                                                                 nratvars,                                                               
-                                                                A.rvars_to_int,
-                                                                A.int_to_rvars,
+                                                                A.drvars_to_int,
+                                                                A.int_to_drvars,
                                                                 A.nrdv,
                                                                 A.npdv,
                                                                 A.npv,
@@ -156,6 +158,7 @@ function change_alg_char_QQ(prime :: Integer, A :: OreAlg)
                                                                 A.nomul,
                                                                 A.order,
                                                                 nctx,
+                                                                A.varord,
                                                                 A.inp)
 
     pl = [change_coefficient_field(p,tmpA) for p in A.pols_loc]
@@ -164,8 +167,8 @@ function change_alg_char_QQ(prime :: Integer, A :: OreAlg)
     return OreAlg{eltype1_ctx(nctx),typeof(nctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
                                                                 A.indexp_to_strvar,
                                                                 nratvars,                                                               
-                                                                A.rvars_to_int,
-                                                                A.int_to_rvars,
+                                                                A.drvars_to_int,
+                                                                A.int_to_drvars,
                                                                 A.nrdv,
                                                                 A.npdv,
                                                                 A.npv,
@@ -175,6 +178,7 @@ function change_alg_char_QQ(prime :: Integer, A :: OreAlg)
                                                                 A.nomul,
                                                                 A.order,
                                                                 nctx,
+                                                                A.varord,
                                                                 A.inp)
 end
 
@@ -284,6 +288,7 @@ function evaluate_parameter_algebra(p :: Int,A :: OreAlg)
                     A.nomul,
                     order(A),
                     new_ctx,
+                    A.varord,
                     A.inp)
     ev_pol_locs = evaluate_parameter(A.pols_loc, p, tmpA)
     ev_diff_pols_loc = evaluate_parameter(A.diff_pols_loc, p, tmpA)
@@ -301,6 +306,7 @@ function evaluate_parameter_algebra(p :: Int,A :: OreAlg)
                     A.nomul,
                     order(A),
                     new_ctx,
+                    A.varord,
                     A.inp)
 end
 

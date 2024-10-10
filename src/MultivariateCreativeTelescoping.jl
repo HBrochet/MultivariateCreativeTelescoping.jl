@@ -10,12 +10,14 @@ using FLINT_jll: libflint
 
 include("globalstats.jl")
 include("primes.jl")
+# include("SLP.jl")
 
 include("TypeCoefficient.jl")
 include("TypeOreMonomial.jl")
 include("TypeOrePolynomial.jl")
 include("TypeMonOrder.jl")
 include("TypeOreAlgebra.jl")
+include("IndicialEqs.jl")
 
 include("interface_FLINT.jl")
 
@@ -42,7 +44,7 @@ include("CRT.jl")
 include("CauchyInterpolation.jl")
 
 include("testfunctions.jl")
-
+# include("IndicialEqs.jl")
 @exportAll()
 
 end

@@ -20,7 +20,7 @@ function normalize!(P :: OrePoly, A :: OreAlg)
             c = add(c,coeff(P, r),ctx(A))
         end
 
-        if !iszero(c)
+        if !iszero(c,A)
             w += 1
             P[w] = (c,m)
         end
@@ -60,7 +60,7 @@ function add!(P :: OrePoly, Q :: OrePoly, A :: OreAlg; normal :: Bool = true)
             s += 1
         elseif mon(P,ip) == mon(Q,iq)
             c = add(coeff(P,ip), coeff(Q,iq), ctx(A))
-            if !iszero(c,ctx(A))
+            if !iszero(c,A)
                 res[s] = (c, mon(P,ip))
                 s +=1
             end
@@ -147,10 +147,12 @@ function mul!(c :: T, P :: OrePoly, A :: OreAlg{T, C, M,O}) where {T, C, M,O}
     for i in eachindex(coeffs(P))
         cs[i] = mul(c, coeff(P,i), ctx(A))
     end
+    return P
 end
 
 function makemonic!(P :: OrePoly, A :: OreAlg)
     mul!(inv(coeff(P,1),ctx(A)),P,A)
+    return P
 end
 
 function sub!(P :: OrePoly, Q :: OrePoly, A :: OreAlg; normal :: Bool = true)
@@ -169,7 +171,7 @@ function sub!(P :: OrePoly, Q :: OrePoly, A :: OreAlg; normal :: Bool = true)
             s += 1
         elseif mon(P,ip) == mon(Q,iq)
             c = sub(coeff(P,ip), coeff(Q,iq), ctx(A))
-            if !iszero(c,ctx(A))
+            if !iszero(c,A)
                 res[s] = (c, mon(P,ip))
                 s +=1
             end
@@ -250,7 +252,7 @@ function mul(m :: OreMonVE, p :: OrePoly, A :: OreAlg; normal = true)
 end
 
 
-function mul( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: OreAlg; normal=true) where {M,K}
+function mul( T1 ::Tuple{K,M}, T2 :: Tuple{K2,M}, A :: OreAlg; normal=true) where {M,K,K2}
     res = mul_(T1,T2,A)
     if normal
         normalize!(res,A)
@@ -258,7 +260,7 @@ function mul( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: OreAlg; normal=true) where
     return res
 end
 
-function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: OreAlg) where {M,K}
+function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K2,M}, A :: OreAlg) where {M,K,K2}
     #noncomm = Int[]
     s = 1 # size of the product before the call to normalize!
 
@@ -294,7 +296,7 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: OreAlg) where {M,K}
             else 
                 c = derivative(T2[1])
             end
-            if iszero(c,ctx(A)); continue end
+            if iszero(c,A); continue end
             res = undefOrePoly(T1[2][l]+1,A)
             dt = makemon(l,A)
             res[1] = (T2[1], T2[2] * dt^T1[2][l])
@@ -312,40 +314,78 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K,M}, A :: OreAlg) where {M,K}
         end 
     end
 
-    for l in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv
-        tmp = min(T1[2][l],T2[2][l-A.npdv])
-        s = s * (tmp + 1)
-        if s < 0
-            println(T1[2][l], " ", T2[2][l-A.npdv])
-        end
-    end
-
-    res = undefOrePoly(s,A)
-    res[1] = (mul(T1[1],T2[1],ctx(A)), T1[2] * T2[2])
-
-    w = 2 # write index in res
-    r = 1
-
-    for i in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv
-        if T1[2][i] == 0 || T2[2][i-A.npdv] == 0; continue end
-
-        fact = convertn(1,ctx(A)) # to store decreasing factorials
-        for j in 1:min(T1[2][i],T2[2][i-A.npdv])
-            fact = mul(fact,convertn(T1[2][i]-j+1,ctx(A)),ctx(A))
-            fact = opp(fact,ctx(A))
-            for l in 1:r
-                c = mul(mul(fact,
-                            convertn(binomial(Int(T2[2][i-A.npdv]), j), ctx(A)),
-                            ctx(A)),
-                        res[l][1], ctx(A))
-
-                m = res[l][2] / (makemon(i,A) * makemon(i-A.npdv,A))^j
-                res[w] = (c, m)
-
-                w = w + 1
+    if A.varord == "dleft"
+        for l in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv
+            tmp = min(T1[2][l],T2[2][l-A.npdv])
+            s = s * (tmp + 1)
+            if s < 0
+                println(T1[2][l], " ", T2[2][l-A.npdv])
             end
         end
-        r = w-1
+
+        res = undefOrePoly(s,A)
+        res[1] = (mul(T1[1],T2[1],ctx(A)), T1[2] * T2[2])
+
+        w = 2 # write index in res
+        r = 1
+
+    
+        for i in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv
+            if T1[2][i] == 0 || T2[2][i-A.npdv] == 0; continue end
+
+            fact = convertn(1,ctx(A)) # to store decreasing factorials
+            for j in 1:min(T1[2][i],T2[2][i-A.npdv])
+                fact = mul(fact,convertn(T1[2][i]-j+1,ctx(A)),ctx(A))
+                fact = opp(fact,ctx(A))
+                for l in 1:r
+                    c = mul(mul(fact,
+                                convertn(binomial(Int(T2[2][i-A.npdv]), j), ctx(A)),
+                                ctx(A)),
+                            res[l][1], ctx(A))
+
+                    m = res[l][2] / (makemon(i,A) * makemon(i-A.npdv,A))^j
+                    res[w] = (c, m)
+
+                    w = w + 1
+                end
+            end
+            r = w-1
+        end
+    else 
+        for l in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv
+            tmp = min(T1[2][l-A.npdv],T2[2][l])
+            s = s * (tmp + 1)
+            if s < 0
+                println(T1[2][l], " ", T2[2][l-A.npdv])
+            end
+        end
+
+        res = undefOrePoly(s,A)
+        res[1] = (mul(T1[1],T2[1],ctx(A)), T1[2] * T2[2])
+
+        w = 2 # write index in res
+        r = 1
+
+        for i in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv
+            if T1[2][i-A.npdv] == 0 || T2[2][i] == 0; continue end
+
+            fact = convertn(1,ctx(A)) # to store decreasing factorials
+            for j in 1:min(T1[2][i-A.npdv],T2[2][i])
+                fact = mul(fact,convertn(T1[2][i-A.npdv]-j+1,ctx(A)),ctx(A))
+                for l in 1:r
+                    c = mul(mul(fact,
+                                convertn(binomial(Int(T2[2][i]), j), ctx(A)),
+                                ctx(A)),
+                            res[l][1], ctx(A))
+
+                    m = res[l][2] / (makemon(i-A.npdv,A) * makemon(i,A))^j
+                    res[w] = (c, m)
+
+                    w = w + 1
+                end
+            end
+            r = w-1
+        end
     end
     return res
 end

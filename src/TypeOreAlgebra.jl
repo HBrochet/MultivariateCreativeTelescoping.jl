@@ -8,14 +8,15 @@ mutable struct OreAlgInput
     polvars :: Vector{String}
     locvars :: Tuple{Vector{String},Vector{String}}
     nomul :: Vector{String}
+    varord :: String
 end
 
 struct OreAlg{T, C <:AbsContextCoeff, M <: AbsOreMonomial, O <: AbsMonomialOrder}
     strvar_to_indexp :: Dict{String,Int} # map strings of vars represented in monomials to corresponding index in the exponent
     indexp_to_strvar :: Vector{String} # same but in the other direction
     ratvars :: Dict{String,T}  # maps strings or ratvars represented in the coeff to an object of type T 
-    rvars_to_int :: Dict{String,Int} # maps strings or ratvars represented in the coeff to their associated diff var if they have one 
-    int_to_rvars :: Vector{String} # same but in the other direction
+    drvars_to_int :: Dict{String,Int} # maps strings or ratvars represented in the coeff to their associated diff var if they have one 
+    int_to_drvars :: Vector{String} # same but in the other direction
 
 
     nrdv :: Int # nb of pair (rat var, diff var) 
@@ -29,6 +30,7 @@ struct OreAlg{T, C <:AbsContextCoeff, M <: AbsOreMonomial, O <: AbsMonomialOrder
     nomul :: Vector{Int} # indices of the variable with which we can't multiply
     order :: O
     ctx :: C 
+    varord :: String
     inp :: OreAlgInput
 end
 
@@ -49,8 +51,9 @@ function OreAlg(;order :: String = "",
     poldiffvars :: Tuple{Vector{String},Vector{String}}=(String[],String[]), 
     polvars :: Vector{String} = String[],
     locvars :: Tuple{Vector{String},Vector{String}} = (String[],String[]),
-    nomul :: Vector{String} = String[]
-        )
+    nomul :: Vector{String} = String[],
+    varord :: String = "dleft")
+
     ### Create context for coefficients
     ctx = make_coeff_context(char,ratvars,ratdiffvars)
 
@@ -65,7 +68,7 @@ function OreAlg(;order :: String = "",
     ### Creating the monomial order
     ord = make_order(order,sti,Val(M))
 
-    inp = OreAlgInput(order, char,ratvars, ratdiffvars,poldiffvars,polvars,locvars,nomul)
+    inp = OreAlgInput(order, char,ratvars, ratdiffvars,poldiffvars,polvars,locvars,nomul,varord)
 
     ### Computing the polynomials w.r.t. which we localize and their derivatives
     tmpA = OreAlg{eltype1_ctx(ctx), typeof(ctx),M,typeof(ord)}(sti,
@@ -82,6 +85,7 @@ function OreAlg(;order :: String = "",
                                             Int[],
                                             ord,
                                             ctx,
+                                            varord,
                                             inp)
     
     (polsloc, diff_pols_loc) = compute_locpol_and_derivs(locvars[2],tmpA)
@@ -101,6 +105,7 @@ function OreAlg(;order :: String = "",
                                             nomul_,
                                             ord,
                                             ctx,
+                                            varord,
                                             inp)
 end
 
@@ -161,6 +166,7 @@ function make_var_tables(ratvars :: Vector{String},
     for (i,s) in enumerate(ratvars)
         rv[s] = ctx.F(ctx.vars[i+length(ratdiffvars[1])])
     end
+
 
     for (i,s) in enumerate(ratdiffvars[2])
         sti[s] = i
@@ -223,7 +229,8 @@ function OreAlg(inp :: OreAlgInput)
                 poldiffvars = inp.poldiffvars, 
                 polvars = inp.polvars,
                 locvars = inp.locvars,
-                nomul = inp.nomul)
+                nomul = inp.nomul,
+                varord = inp.varord)
 end
 
 
@@ -234,6 +241,16 @@ eltype_co(A :: OreAlg{T,C,M,O}) where {T, C, M,O} = T
 eltype_mo(A :: OreAlg{T,C,M,O}) where {T,C,M, O} = M
 eltype_ord(A :: OreAlg{T,C,M,O}) where {T,C,M, O} = O
 makemon(i :: Integer, A :: OreAlg{T, K, M,O}) where {T, K,N,E,M <: OreMonVE{N,E},O} = OreMonVE(SVector{N,E}(i==j ? E(1) : E(0) for j in 1:N))
+Base.iszero(x :: T, A :: OreAlg) where T = iszero(x,ctx(A))
+
+function divide(m1 :: OreMonVE, m2 :: OreMonVE{N,E}) where {N,E}
+    for i in 1:N 
+        if m1[i] > m2[i]
+            return false 
+        end
+    end
+    return true 
+end
 
 function divide(m1 :: OreMonVE, m2 :: OreMonVE{N,E}, A :: OreAlg) where {N,E}
     for i in A.nomul
@@ -395,7 +412,7 @@ function commute(p :: OrePoly, q :: OrePoly, A :: OreAlg)
         return true
     end
     for i in 1:A.nrdv 
-        v = numerator(A.ratvars[A.int_to_rvars[i]],false)
+        v = numerator(A.ratvars[A.int_to_drvars[i]],false)
         if eq[i] > 0 
             for j in 1:length(p) 
                 if v in vars(coeff(p,j))
@@ -417,4 +434,3 @@ end
 function leadingterms(v :: Vector{OrePoly{T,M}}) where {T,M}
     return [OrePoly([coeff(p,1)],[mon(p,1)]) for p in v]
 end
-

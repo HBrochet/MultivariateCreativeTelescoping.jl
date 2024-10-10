@@ -36,10 +36,11 @@ end
 
 function expr_to_OreAlg(expr :: Number, A :: OreAlg)
     c = convertn(expr,ctx(A))
-    if iszero(c,ctx(A))
+    if iszero(c,A)
         return zero(A)
     end
     return makepoly(c,makemon(-1,A))
+
 end
 
 
@@ -89,7 +90,11 @@ function expr_to_OreAlg_call(expr :: Expr, A :: OreAlg)
     elseif op == :^ 
         #b should be an integer
         powa = deepcopy(a)
-        bound = coeff(b,1)
+        if length(b) == 0 
+            bound = zero(ctx(A))
+        else
+            bound = coeff(b,1)
+        end
         if bound isa RatFunQQ || bound isa RatFunModp || bound isa RatFunModP || bound isa UnivRatFunQQ || bound isa UnivRatFunModp || bound isa UnivRatFunModP 
             if is_zero(bound)
                 bound = 0
@@ -107,6 +112,9 @@ function expr_to_OreAlg_call(expr :: Expr, A :: OreAlg)
             bound = numerator(bound,false)
         elseif bound isa fpFieldElem
             bound = bound.data
+        # elseif bound isa SLP 
+        #     bound = eval(bound,[ctx(A).R(0) for i in 1:number_of_variables(ctx(A).R)],A)
+        #     bound = constant_coefficient(bound)
         elseif !(bound isa Integer) # à changer
             bound = Int(evaluate(bound, [1 for i in 1:A.nrdv]).num)
         end
@@ -123,11 +131,28 @@ function expr_to_OreAlg_call(expr :: Expr, A :: OreAlg)
 end
 
 function printmon(m :: OreMonVE{N,E}, A :: OreAlg) where {N,E}
-    for i in 1:N 
-        if m[i] == E(1) 
-            print(A.indexp_to_strvar[i])
-        elseif m[i] != E(0) 
-            print(A.indexp_to_strvar[i],"^",m[i])
+    if A.varord == "dleft"
+        for i in 1:N 
+            if m[i] == E(1) 
+                print(A.indexp_to_strvar[i])
+            elseif m[i] != E(0) 
+                print(A.indexp_to_strvar[i],"^",m[i])
+            end
+        end
+    else
+        for i in A.nrdv + A.npdv +1:N 
+            if m[i] == E(1) 
+                print(A.indexp_to_strvar[i])
+            elseif m[i] != E(0) 
+                print(A.indexp_to_strvar[i],"^",m[i])
+            end
+        end
+        for i in 1:A.nrdv + A.npdv
+            if m[i] == E(1) 
+                print(A.indexp_to_strvar[i])
+            elseif m[i] != E(0) 
+                print(A.indexp_to_strvar[i],"^",m[i])
+            end
         end
     end
 end
@@ -196,11 +221,28 @@ end
 
 function mystring(m :: OreMonVE{N,E}, A :: OreAlg) where {N,E}
     s = "" 
-    for i in 1:N 
-        if m[i] == E(1) 
-            s *= string(A.indexp_to_strvar[i])*"*"
-        elseif m[i] != E(0) 
-            s *= string(A.indexp_to_strvar[i])*"^"*string(m[i])*"*"
+    if A.varord == "dleft"
+        for i in 1:N 
+            if m[i] == E(1) 
+                s *= string(A.indexp_to_strvar[i])*"*"
+            elseif m[i] != E(0) 
+                s *= string(A.indexp_to_strvar[i])*"^"*string(m[i])*"*"
+            end
+        end
+    else
+        for i in A.nrdv+A.npdv+1:N 
+            if m[i] == E(1) 
+                s *= string(A.indexp_to_strvar[i])*"*"
+            elseif m[i] != E(0) 
+                s *= string(A.indexp_to_strvar[i])*"^"*string(m[i])*"*"
+            end
+        end
+        for i in 1:A.nrdv+A.npdv
+            if m[i] == E(1) 
+                s *= string(A.indexp_to_strvar[i])*"*"
+            elseif m[i] != E(0) 
+                s *= string(A.indexp_to_strvar[i])*"^"*string(m[i])*"*"
+            end
         end
     end
     return s*"1"

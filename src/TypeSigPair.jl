@@ -110,8 +110,22 @@ function mul(v :: OreMonVE,f :: SigPair{N,K,M}, A :: OreAlg)  where {M,N,K}
     return SigPair(mul(v,f.op,A), Signature(v*f.sig.mon,f.sig.ind))
 end
 
+
 function mul(a :: OreMonVE, sig :: Signature{N})   where N
     return Signature(sig.mon*a, sig.ind)
+end
+
+function mul(c :: K,f :: SigPair{N,K,M}, A :: OreAlg)  where {M,N,K}
+    return SigPair(mul(c,f.op,A), f.sig)
+end
+
+function mul!(v :: OreMonVE,f :: SigPair{N,K,M}, A :: OreAlg)  where {M,N,K}
+    return SigPair(mul!(v,f.op,A), Signature(v*f.sig.mon,f.sig.ind))
+end
+
+
+function mul!(c :: K,f :: SigPair{N,K,M}, A :: OreAlg)  where {M,N,K}
+    return SigPair(mul!(c,f.op,A), f.sig)
 end
 
 function prettyprint(s :: Signature,A :: OreAlg)

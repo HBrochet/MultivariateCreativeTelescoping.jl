@@ -139,6 +139,6 @@ end
         return OrePoly(cs,deepcopy(mons(p)))
     end
     
-    res = compute_with_cauchy_interpolation(foo,A,p,many=true)
+    res = compute_with_cauchy_interpolation(foo,A,p)
     @test res == parse_OrePoly("t^2",A)
 end

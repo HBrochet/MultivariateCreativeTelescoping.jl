@@ -71,7 +71,7 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;d
             end 
             bound += 1
         end
-        # if npoints ==20000
+        # if npoints ==100
         #     # println("randpoints")
         #     # println(randpoints)
         #     # print("evres")
@@ -260,6 +260,10 @@ function cauchy_interpolation_known_den(vec :: Vector{Tuple{Dict{M,OrePoly{T,M}}
     return cauchy_interpolation_known_den([vec[i][1] for i in 1:length(vec)], randpoints,ev_den,den, A), cauchy_interpolation_known_den([vec[i][2] for i in 1:length(vec)], randpoints,ev_den,den, A)
 end
 
+function cauchy_interpolation_known_den(vec :: Vector{Vector{OrePoly{T,M}}}, randpoints :: Vector{Int}, ev_den :: Vector{T}, den ::TT, A :: OreAlg) where {T,TT,M}
+    return [cauchy_interpolation_known_den([vec[i][j] for i in 1:length(vec)], randpoints,ev_den,den, A) for j in 1:length(vec[1])]
+end
+
 function cauchy_interpolation_known_den(ev_res :: Vector{OrePoly{T,M}},randpoints ::Vector{Int}, ev_den :: Vector{T},den::TT, A ::OreAlg) where {T,TT,M}
     if length(ev_res[1]) == 0 
         return zero(A)
@@ -315,7 +319,18 @@ function random_cbl(ev_res::Vector{OrePoly{T,M}},A :: OreAlg) where {T,M}
     return vres 
 end
 
-
+function random_cbl(ev_res::Vector{Vector{OrePoly{T,M}}},A :: OreAlg) where {T,M}
+    vres = [zero(ctx(A)) for i in 1:length(ev_res)]
+    for l in 1:length(ev_res[1])
+        for ll in 1:length(ev_res[1][l])
+            lambda = convertn(rand(Int),ctx(A))
+            for i in 1:length(ev_res)
+                vres[i] = add(vres[i],mul(coeff(ev_res[i][l],ll),lambda,ctx(A)),ctx(A))
+            end
+        end
+    end
+    return vres 
+end
 
 
 

@@ -358,8 +358,8 @@ submul(a :: RatFunQQ, b :: RatFunQQ, c :: RatFunQQ, ctx ::RatFunQQCtx) = a - b *
 normal(a :: RatFunQQ, ctx :: RatFunQQCtx) = a 
 inflate(a :: RatFunQQ, ctx :: RatFunQQCtx) = a 
 deflate(a :: RatFunQQ, ctx :: RatFunQQCtx) = a 
-convert(a :: Int, ctx :: RatFunQQCtx) = ctx.F(a)
-convertn(a :: Integer, ctx :: RatFunQQCtx) = ctx.F(a)
+convert(a, ctx :: RatFunQQCtx) = ctx.F(a)
+convertn(a, ctx :: RatFunQQCtx) = ctx.F(a)
 
 Base.one(ctx :: RatFunQQCtx) = ctx.F(1)
 Base.zero(x :: T, ctx :: RatFunQQCtx) where T = ctx.F(0)
@@ -394,4 +394,29 @@ Base.zero(ctx :: QQCtx) = QQ(0)
 
 Base.iszero(x :: QQFieldElem, ctx :: QQCtx) = x == QQ(0)
 Base.isone(x :: QQFieldElem, ctx :: QQCtx) = x == QQ(1)
+
+
+# struct SLPCtx{N,T,P} <: AbsContextCoeff{SLP{N,T}, SLP{N,T}}
+#     R :: P
+# end
+
+# SLPCtx(N :: Int,R :: ZZMPolyRing) = SLPCtx{N,elem_type(R),typeof(R)}(R)
+
+
+# add(a :: SLP, b :: SLP,:: SLPCtx) = SLP(:add,a,b)
+# sub(a :: SLP, b :: SLP,:: SLPCtx) = SLP(:sub,a,b)
+# mul(a :: SLP, b :: SLP,:: SLPCtx) = SLP(:mul,a,b)
+# opp(a :: SLP,:: SLPCtx) = SLP(:opp,a)
+# shift(a :: SLP, m::SVector,:: SLPCtx) = SLP(m,:shift,nothing,a,nothing)
+# # mulshift(a :: SLP, b :: SLP,m::SVector,:: SLPCtx) = SLP(m,:mulshift,nothing,a,b)
+
+# # creates a leaf
+# SLP(a :: K, ctx :: SLPCtx{N,T,P}) where {K,N,T,P} =  SLP{N,T}(SVector{N,Int16}(0 for i in 1:N),:pol,ctx.R(a),nothing,nothing)
+
+# convertn(a :: T,ctx::SLPCtx) where T = SLP(ctx.R(a),ctx)
+# Base.one(ctx :: SLPCtx) = convertn(1,ctx)
+# Base.zero(ctx :: SLPCtx) = convertn(0,ctx)
+
+            
+
 

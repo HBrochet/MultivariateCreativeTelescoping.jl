@@ -34,14 +34,14 @@ end
 function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: OreAlg) where {T,M}
     red_dt = find_red_dt(gb,A)
     g1,g2 = separate(gb,A)
+    if length(g2) == 0
+        return spol, g1, red_dt, OrePoly{T,M}[]
+    end
+
     lm_g1 = [mon(g,1) for g in g1]
     spol = GD_reduction1!(spol,g1,A)
     d = maxdegx(spol,A)
-    if length(g2) > 0
-        tmp =  maximum([maximum([sum(m[i] for i in 2+A.npdv:1+2*A.npdv) - sum(m[i] for i in 2:1+A.npdv) for m in mons(p)]) for p in g2])
-    else
-        return spol, g1, red_dt, OrePoly{T,M}[]
-    end
+    tmp =  maximum([maximum([sum(m[i] for i in 2+A.npdv:1+2*A.npdv) - sum(m[i] for i in 2:1+A.npdv) for m in mons(p)]) for p in g2])
     d = max(d,tmp) + 2
     t = time()
     echelon, next_incr = GD_prereduction_init(g2, g1, d, A)
@@ -52,6 +52,7 @@ function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: Or
     # maximal increase in degree when multiplying by dt
     l = maximum([sum(mon(red_dt,j)[i] for i in 2+A.npdv:1+2*A.npdv) - sum(mon(red_dt,j)[i] for i in 2:1+A.npdv) for j in 2:length(red_dt)])
     if l <= 0 
+        #is it overkill ? 
         for i in 1:5
             next_incr = GD_prereduction_increment!(echelon,next_incr,g1,SortedSet{M}(order(A)),A)
         end
@@ -83,20 +84,17 @@ function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: Or
         understair, irred = next_slice(understair, lm_g1, lm_ech, A)
         push!(stairs,SortedSet{M}(order(A),irred))
         update_stairs!(stairs,newlm,nd,A)
-        # if itt == 15
+        # if itt == 20
         #     prettyprint(stairs,A)
         #     println(sum(mon(echelon[1],1).exp)," ", sum(mon(echelon[end],1).exp), " ",length(echelon))
         #     println(nd)
         #     println(l)
-        #     prettyprint(next_incr,A)
+        #     # prettyprint(next_incr,A)
         #     error("fin")
         # end
     end
-    
-    ## bonus for minimality 
-    # for i in 1:5
-    #     next_incr = GD_prereduction_increment!(echelon,next_incr,g1,SortedSet{M}(order(A)),A)
-    # end
+    prettyprint(stairs,A)
+
     spol = reduce_with_echelon!(echelon,spol,A)
     # error("fin")
     return spol, g1, red_dt, echelon

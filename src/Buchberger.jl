@@ -75,7 +75,7 @@ function buchberger(f :: Vector{OrePoly{K,M}}, A :: OreAlg) where {K,M}
     return g
 end
 
-
+# It assumes that every pivots have been found
 function reducebasis!(f :: Vector{OrePoly{K,M}}, A :: Alg) where {K,M, Alg <:OreAlg}
     i = 1
 
