@@ -11,13 +11,9 @@ where ``\boldsymbol{x}=(x_1,\dots,x_n)`` and ``f`` is a D-finite/holonomic funct
 
 ## Installation
 
-This package is not yet registered in the general Julia registry. To install it follow the three steps below: 
- - clone the repository on your computer
- - add the line below in your julia config file located at ~/.julia/config/startup.jl
- - replace /PATH/TO with the path to the downloaded repository. 
-
+Open Julia in a terminal and execute the following line to install the package.
 ```
-push!(LOAD_PATH, "/PATH/TO/MultivariateCreativeTelescoping")
+] add MultivariateCreativeTelescoping
 ```
 
 Then you should be able to load the package in Julia's REPL with the command
