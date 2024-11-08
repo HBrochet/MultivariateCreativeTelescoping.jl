@@ -91,6 +91,80 @@ function add!(P :: OrePoly, Q :: OrePoly, A :: OreAlg; normal :: Bool = true)
     return res
 end
 
+
+# function add_in_place!(P ::OrePoly, Q :: OrePoly, A::OreAlg)
+#     ctx = ctx(A)
+#     lenp = length(P)
+#     lenq = length(Q)
+
+#     ipr = 1 # reading index in P
+#     ipw = 1 # writting index in P
+#     iq = 1 # reading index in Q 
+#     # R is a temporary polynomial that we store at the beginning of Q 
+#     irr = 1 # reading index of R in Q
+#     irw = 1 # writing index of R in Q
+
+    # while ipr <= lenp && iqr <= lenq 
+    #     if lt(order(A), mon(Q,iq),mon(P,ip))
+    #         P[ipw] = P[ipr]
+    #         ipw += 1
+    #         ipr += 1
+    #     elseif mon(P,ip) == mon(Q,iq) 
+    #         c = add(P.coeffs[ipr],Q.coeffs[iq],ctx)
+    #         if !iszero(c)
+    #             P[ipw] = (c,mp) 
+    #             ipw += 1
+    #         end
+    #         ipr += 1
+    #         iq += 1
+    #     elseif ipw < ipr  # we know that mq > mp
+    #         P[ipw]= Q[iq]
+    #         iq += 1
+    #         ipw += 1 
+    #     else
+    #         tmp = Q[iq]
+    #         Q[irw] = P[ipr]
+    #         P[ipw] = tmp
+
+    #         irw += 1
+    #         iq += 1
+    #         ipw += 1
+    #         ipr += 1
+
+    #         # by construction we allways have mr > mp
+    #         while irw - irr > 0 && ipr <= lenp && iqr <= lenq
+    #             mr = mon(Q,irr)
+    #             mq = mon(Q,iq)
+    #             if lt(order(A), mr, mq)
+    #                 tmp = (coeff(Q,iq), mq)
+    #                 Q[irw] = P[ipr]
+    #                 P[ipw] = tmp
+        
+    #                 iq += 1
+    #                 ipw += 1
+    #                 ipr += 1
+    #                 irw += 1
+
+    #             elseif mr == mq 
+    #                 c = coeff(Q,iq) + coeff(Q,irr)
+    #                 if !iszero(c)
+    #                     tmp = P[ipr]
+    #                     P[ipw] = (c,mr) 
+    #                     Q[ipw] = tmp
+    #                     ipw += 1
+    #                     ipr += 1
+    #                     irw +=1
+    #                 end
+    #                 iq += 1 
+    #                 irr += 1
+    #             else # mq < mr 
+    #                 c = coeff(Q,irr)
+                    
+
+    #     end
+    # end
+
+
 """
     add(p :: OrePoly, q :: OrePoly, A :: OreAlg)
 
