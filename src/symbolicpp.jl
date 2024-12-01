@@ -1,3 +1,15 @@
+struct F4Param{B,C,D} <: GBParam end 
+
+f4_param(;stophol :: Val{B} = Val(false),
+         stat :: Val{C} = Val(false),
+         debug :: Val{D} = Val(false)) where {B,C,D} = F4Param{B,C,D}() 
+
+stophol(:: F4Param{B,C,D}) where {B,C,D} = B 
+stat(:: F4Param{B,C,D}) where {B,C,D} = C 
+debug(::F4Param{B,C,D}) where {B,C,D} = D
+
+
+
 # Building upon AbsOreMonomial define monomials indexed by integers
 
 struct IdxMon  <: AbsOreMonomial{Int}
@@ -104,7 +116,8 @@ end
 function saturate!(A::alg,
                    rows::Vector{OrePoly{K,M}},
                    basis::Vector{OrePoly{K,M}},
-                   todo::Set{M}, done::Set{M}
+                   todo::Set{M}, done::Set{M},
+                   param ::F4Param
                    ) where {K,M, alg <: OreAlg}
 
     # recursively find all possible reducers
@@ -118,19 +131,19 @@ function saturate!(A::alg,
 
         # search for a reducer
         # TODO benchmark and improve
-        for red in Iterators.reverse(basis)
+        for i in length(basis):-1:1
+            red = basis[i]
             lmred = mon(red,1)
             if divide(lmred, m,A)
-
                 sred = shift(red, m,A)
-                # println("new line with $(length(sred)) monomials and degree $(sum(mon(sred,1)))")
-                # println("mon $(m)")
-                # prettyprint(red,A)
-                # prettyprint(sred,A)
+                if stat(param) 
+                    globalstats.counters[:f4_nb_reducer_computed] += 1
+                    globalstats.counters[:f4_size_reducer] += length(sred)
+                    globalstats.counters[:f4_size_m]+= sum(m/lmred)
+                    globalstats.counters[:f4_deg_reducer] += maxdeg(sred)
+                    add_reducer_globalstats!(i, m/lmred)
+                end
 
-                # if length(rows) > 20 
-                #     error("fin")
-                # end
                 pushrow!(A, rows, sred, todo, done)
                 break
             end
@@ -151,7 +164,7 @@ end
 
 function f4matrix(A::alg,
                   rows::Vector{OrePoly{K,M}},
-                  monomialset::Set{M}, donotpivot::Set{M},
+                  monomialset::Set{M}, donotpivot::BitSet,
                   inputrows::BitSet
                   ) where {K,M, alg <: OreAlg}
 
@@ -168,7 +181,7 @@ function f4matrix(A::alg,
     # Among all possible pivots for a column, we choose the last
     pivots = zeros(Int, length(monomials))
     for (i, row) in enumerate(rows)
-        #IdxMon(i) ∈ donotpivot && continue
+        IdxMon(i) ∈ donotpivot && continue
         pivots[mon(row,1)] = i
     end
 
@@ -181,6 +194,7 @@ function f4matrix(A::alg,
                 mult = inv(lc, ctx(A))
                 newco = [mul(mult, c,ctx(A)) for c in row.coeffs]
                 rows[p] = OrePoly(newco,mons(row))
+                #todo optimiser
             end
         end
     end
@@ -212,8 +226,9 @@ end
 function symbolicpp(A::alg,
     pols::Vector{OrePoly{K,M}},
     basis::Vector{OrePoly{K,M}},
+    param ::F4Param,
     interreduction::Bool=true,
-    spairrecution::Bool=false,
+    spairrecution::Bool=false
    ) where {alg <: OreAlg, K, M}
 
     isempty(pols) && error("nothing to preprocess")
@@ -226,6 +241,9 @@ function symbolicpp(A::alg,
 
     for (i, p) in enumerate(pols)
         if spairrecution
+            if stat(param)
+                globalstats.counters[:f4_nb_reducer_computed] += 1
+            end
             # in F4, we reduce together a bunch of half-S-pairs. In this case,
             # we do not need to search a reducer for leading terms, because it
             # is already reduced by the other half.
@@ -235,13 +253,14 @@ function symbolicpp(A::alg,
         push!(inputrows, length(rows))
     end
 
-    saturate!(A, rows, basis, todo, done)
+    saturate!(A, rows, basis, todo, done,param)
 
-    return f4matrix(A, rows, done, interreduction ? Set{M}() : inputrows, inputrows)
+    return f4matrix(A, rows, done, interreduction ? BitSet() : inputrows, inputrows)
 end
 
 function interreductionmx(A :: OreAlg,
                           basis::Vector{OrePoly{I, T}},
+                          param :: F4Param
                           ) where {I, T}
 
 
@@ -263,9 +282,9 @@ function interreductionmx(A :: OreAlg,
     for (i, p) in enumerate(basis)
         pushrow!(A, rows, p, todo, done)
         push!(inputrows, length(rows))
-        saturate!(A, rows, currentbasis, todo, done)
+        saturate!(A, rows, currentbasis, todo, done,param)
         push!(currentbasis, p)
     end
 
-    return f4matrix(A, rows, done, Set{T}(), inputrows)
+    return f4matrix(A, rows, done, BitSet(), inputrows)
 end

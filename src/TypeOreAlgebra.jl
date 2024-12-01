@@ -242,6 +242,8 @@ eltype_mo(A :: OreAlg{T,C,M,O}) where {T,C,M, O} = M
 eltype_ord(A :: OreAlg{T,C,M,O}) where {T,C,M, O} = O
 makemon(i :: Integer, A :: OreAlg{T, K, M,O}) where {T, K,N,E,M <: OreMonVE{N,E},O} = OreMonVE(SVector{N,E}(i==j ? E(1) : E(0) for j in 1:N))
 Base.iszero(x :: T, A :: OreAlg) where T = iszero(x,ctx(A))
+Base.iszero(p :: OrePoly, A :: OreAlg) = length(p) == 0 
+
 
 function divide(m1 :: OreMonVE, m2 :: OreMonVE{N,E}) where {N,E}
     for i in 1:N 
@@ -281,6 +283,10 @@ end
 
 function maxdeg(g :: Vector{OrePoly{K,M}},j :: Int) where {K, M}
     return maximum(maxdeg(p,j) for p in g)
+end 
+
+function maxdeg(p :: OrePoly)
+    return maximum(sum(mon(p,i).exp) for i in 1:length(p))
 end  
 
 
@@ -357,7 +363,7 @@ function isholonomic(gb :: Vector{OrePoly{T,M}},A :: Alg) where {T,M, Alg <:OreA
     set = [i for i in 1:A.nrdv+2*A.npdv]
     n = A.npdv
     # returns an iterator over every subset of set of size n+1
-    it = powerset(set,n+1,n+1) 
+    it = mypowerset(set,n+1,n+1) 
 
     for subset in it 
         gfound = false
@@ -385,6 +391,12 @@ function isholonomic(gb :: Vector{OrePoly{T,M}},A :: Alg) where {T,M, Alg <:OreA
     end
     return true
 end
+
+function mypowerset(a, min::Integer=0, max::Integer=length(a))
+    itrs = [combinations(a, k) for k = min:max]
+    Iterators.flatten(itrs)
+end
+
 
 # check if p and q commute
 function commute(p :: OrePoly, q :: OrePoly, A :: OreAlg)
@@ -431,6 +443,7 @@ function commute(p :: OrePoly, q :: OrePoly, A :: OreAlg)
     return true
 end
 
+
 function leadingterms(v :: Vector{OrePoly{T,M}}) where {T,M}
     return [OrePoly([coeff(p,1)],[mon(p,1)]) for p in v]
 end
@@ -443,3 +456,26 @@ function is_polynomial(m ::OreMonVE,A :: OreAlg)
     end
     return true 
 end
+
+### more on ReuseOrePoly
+
+function copy_to_OrePoly!(p :: ReuseOrePoly, A :: OreAlg)
+    ind = p.ind
+    pol = p.op 
+    if ind == 0 
+        return zero(A)
+    end
+    res = undefOrePoly(p.ind,A)
+    for i in 1:ind 
+        res[i] = pol[i]
+    end
+    p.ind = 0
+    return res 
+end
+
+
+function ReuseOrePoly(l :: Int,A :: OreAlg)
+    return ReuseOrePoly(undefOrePoly(l,A),0)
+end
+
+

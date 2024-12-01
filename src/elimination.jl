@@ -75,10 +75,10 @@ function savebuffer!(ctx :: NmodLikeΓ{T, Tbuf},
     return row
 end
 
-
 function elementary_reduction_in_buffer(mx::NmodF4Matrix{I, T, Tbuf},
                                         buffer::Vector{Tbuf},
-                                        j
+                                        j :: Int,
+                                        param :: F4Param
                                         ) where {I, T, Tbuf}
 
     buffer[j] = normal(buffer[j],ctx(mx.A))
@@ -92,12 +92,12 @@ function elementary_reduction_in_buffer(mx::NmodF4Matrix{I, T, Tbuf},
     end
 
     reducer = mx.rows[piv]
-
     #@assert ismonic(reducer)
     #@assert mon(reducer,1) == j
-    globalstats.counters[:f4_line_reductions] += 1
-
-    globalstats.counters[:f4_field_operations] += length(reducer)
+    if stat(param)
+        globalstats.counters[:f4_line_reductions] += 1
+        globalstats.counters[:f4_field_operations] += length(reducer)
+    end
 
     mult = deflate(buffer[j],ctx(mx.A))
     buffer[j] = zero(T,ctx(mx.A))
@@ -108,7 +108,8 @@ function elementary_reduction_in_buffer(mx::NmodF4Matrix{I, T, Tbuf},
     return true
 end
 
-function reduce!(mx::NmodF4Matrix{I, T, Tbuf}) where {T, Tbuf, I}
+
+function reduce!(mx::NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, I}
     #@assert all([i == 0 ? true : ismonic(mx.rows[i]) for i in mx.pivots])
 
     buffer = Vector{Tbuf}(undef, mx.nbcolumns)
@@ -123,7 +124,7 @@ function reduce!(mx::NmodF4Matrix{I, T, Tbuf}) where {T, Tbuf, I}
         leadingterm = 0
 
         for j in mon(row,1):mx.nbcolumns
-            if !elementary_reduction_in_buffer(mx, buffer, j)
+            if !elementary_reduction_in_buffer(mx, buffer, j,param)
                 leadingterm = j
                 break
             end
@@ -148,12 +149,11 @@ function reduce!(mx::NmodF4Matrix{I, T, Tbuf}) where {T, Tbuf, I}
             mx.rows[i] = OrePoly(T[],I[]) # pourquoi a-t-on besoin de ça ? 
         end
     end
-
     return
 end
 
 
-function reducepivots!(mx :: NmodF4Matrix{I, T, Tbuf}) where {T, Tbuf, I}
+function reducepivots!(mx :: NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, I}
 
     buffer = Vector{Tbuf}(undef, mx.nbcolumns)
     # Going bottom up is important for performance
@@ -165,7 +165,7 @@ function reducepivots!(mx :: NmodF4Matrix{I, T, Tbuf}) where {T, Tbuf, I}
 
         fillbuffer!(buffer, row,ctx(mx.A))
         for j in mon(row, 2):mx.nbcolumns
-            elementary_reduction_in_buffer(mx, buffer, j)
+            elementary_reduction_in_buffer(mx, buffer, j,param)
         end
 
         mx.rows[mx.pivots[p]] = savebuffer!(ctx(mx.A), buffer, row, p, false)
@@ -178,6 +178,7 @@ end
 
 function interreduce(alg :: OreAlg,
                       pols :: Vector{OrePoly{I, T}},
+                      param :: F4Param,
                       fullreduction :: Bool = true
                       ) where {I, T}
 
@@ -188,11 +189,11 @@ function interreduce(alg :: OreAlg,
         end
     end
 
-    mx = interreductionmx(alg, pols)
+    mx = interreductionmx(alg, pols,param)
     if fullreduction
-        reducepivots!(mx)
+        reducepivots!(mx,param)
     end
-    reduce!(mx)
+    reduce!(mx,param)
 
 
     # It is important here that a polynomial in `pols` is not chosen as pivots
