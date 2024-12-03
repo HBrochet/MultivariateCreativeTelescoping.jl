@@ -1,6 +1,5 @@
 module MultivariateCreativeTelescoping
 
-using Reexport
 using StaticArrays
 using Combinatorics
 using Nemo
