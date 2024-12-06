@@ -263,7 +263,7 @@ function Buchberger2(gens_ :: Vector{OrePoly{K,M}}, A :: Alg;param ::F4Param = f
     round = 0
 
     while !iscomplete(pgb)
-        if stophol(param) && isholonomic(sgb,A)
+        if stophol(param) && isholonomic(pgb.basis,A)
             debug(param) && @debug "The current partial gb generates a holonomic ideal"
             delete_spairs_with_T!(pgb,A)
         end
