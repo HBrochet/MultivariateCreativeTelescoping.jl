@@ -478,4 +478,10 @@ function ReuseOrePoly(l :: Int,A :: OreAlg)
     return ReuseOrePoly(undefOrePoly(l,A),0)
 end
 
+function max_deg_block(m :: OreMonVE, A::OreAlg)
+    return max_deg_block(order(A),m)
+end
 
+function max_deg_block(p :: OrePoly, A::OreAlg)
+    return max_deg_block(order(A),mon(p,1))
+end

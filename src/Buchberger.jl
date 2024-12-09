@@ -30,7 +30,7 @@ function div!(f :: OrePoly, g :: Vector{OrePoly{K,M}} ,A :: OreAlg; full :: Val{
     while r <= length(f) 
         div = false
         for i in 1:length(g)
-            if divide(mon(g[i],1), mon(f,r),A)
+            if divide(mon(g[i],1), mon(f,r),A) && iscompatible(mon(g[i],1), mon(f,r),A)
                 div = true
                 if stat(param)
                     globalstats.counters[:bbg_nb_div] += 1

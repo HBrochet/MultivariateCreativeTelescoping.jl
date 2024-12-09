@@ -67,7 +67,6 @@ function saturation(g :: Vector{OrePoly{T,M}}, i :: Int, A :: OreAlg; param :: W
     tmp = sub(tmp,one(A),A)
     push!(g, tmp)
     gb, lastpow = init_gb_sat(f5(g,A), bound,i,A)
-
     if method(param) == :buchberger
         gb = Buchberger2(gb,A,param = param.gb_param)
     elseif method(param) == :f4
@@ -84,7 +83,6 @@ function saturation(g :: Vector{OrePoly{T,M}}, i :: Int, A :: OreAlg; param :: W
             morestep -= 1 
         end
         update_gb_sat!(gb,lastpow,bound,i,A)
-
         if method(param) == :buchberger
             gb = Buchberger2(gb,A,param = param.gb_param)
         elseif method(param) == :f4
@@ -92,7 +90,6 @@ function saturation(g :: Vector{OrePoly{T,M}}, i :: Int, A :: OreAlg; param :: W
         else
             gb = f5(gb,A,param = param.gb_param)
         end
-
         res = filter(p -> mon(p,1)[i] == 0, gb) 
         hol = isholonomic(res,A)
     end

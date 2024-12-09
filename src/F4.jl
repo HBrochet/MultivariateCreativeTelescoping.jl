@@ -172,11 +172,17 @@ end
 function selectspairs!(pgb :: PartialGB)
     isempty(pgb.spairs) && return
 
+
     sort!(pgb.spairs, rev=true, order=order(pgb.alg))
-    
+
+    deg = max_deg_block(last(pgb.spairs).lcm,pgb.alg)
+
     ctr = 0 
     while !isempty(pgb.spairs) && ctr < 10000
         sp = last(pgb.spairs)
+        if max_deg_block(sp.lcm,pgb.alg) > deg 
+            break 
+        end
         push!(pgb.candidates, shift(pgb.basis[sp.left ], sp.lcm,pgb.alg))
         push!(pgb.candidates, shift(pgb.basis[sp.right], sp.lcm,pgb.alg))
         pop!(pgb.spairs)
@@ -248,10 +254,9 @@ function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param(
         debug(param) && @debug "found $(length(pgb.newrels)) new relations"
     end
 
-
+    stophol(param) && isholonomic(basis,A) && delete_op_with_T!(basis,A)
     basis = interreduce(A, [pgb.basis[i] for i in pgb.active],param)
-    stophol(param) && delete_op_with_T!(basis,A)
-    reducebasis!(basis,A)
+    # reducebasis!(basis,A)
     sort!(basis, lt = (x,y) -> lt(order(A),x[1][2], y[1][2]), rev = true)
     return basis
 end
@@ -272,12 +277,16 @@ function Buchberger2(gens_ :: Vector{OrePoly{K,M}}, A :: Alg;param ::F4Param = f
         debug(param) && @debug "starting round $round, there are $(length(pgb.spairs)) spairs to be treated"
         generatespairs!(pgb)
         spol = selectspol!(pgb)
+        # prettyprint(spol,A)
         if iszero(spol) 
             debug(param) && @debug "S-polynom is zero"
             continue
         end
+        
         debug(param) && @debug "reducing S-polynom with lm $(lm(spol).exp)"
         spol = div!(spol,pgb.basis,A,param=param)
+        # println("result")
+        # prettyprint(spol,A)
         if !iszero(spol)
             push!(pgb.newrels,spol)
         end
@@ -289,7 +298,7 @@ function Buchberger2(gens_ :: Vector{OrePoly{K,M}}, A :: Alg;param ::F4Param = f
     # end
     # basis = interreduce(A, [pgb.basis[i] for i in pgb.active])
     basis = [pgb.basis[i] for i in pgb.active] # todo: check what pgb.active is 
-    stophol(param) && delete_op_with_T!(basis,A)
+    stophol(param) && isholonomic(basis,A) && delete_op_with_T!(basis,A)
     reducebasis!(basis,A)
     sort!(basis, lt = (x,y) -> lt(order(A),x[1][2], y[1][2]), rev = true)
     return basis
