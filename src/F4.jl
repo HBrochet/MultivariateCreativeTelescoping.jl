@@ -178,7 +178,7 @@ function selectspairs!(pgb :: PartialGB)
     deg = max_deg_block(last(pgb.spairs).lcm,pgb.alg)
 
     ctr = 0 
-    while !isempty(pgb.spairs) && ctr < 10000
+    while !isempty(pgb.spairs) && ctr < 1
         sp = last(pgb.spairs)
         if max_deg_block(sp.lcm,pgb.alg) > deg 
             break 
@@ -254,9 +254,9 @@ function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param(
         debug(param) && @debug "found $(length(pgb.newrels)) new relations"
     end
 
-    stophol(param) && isholonomic(basis,A) && delete_op_with_T!(basis,A)
+    stophol(param) && isholonomic(pgb.basis,A) && delete_op_with_T!(pgb.basis,A)
     basis = interreduce(A, [pgb.basis[i] for i in pgb.active],param)
-    # reducebasis!(basis,A)
+    reducebasis!(basis,A)
     sort!(basis, lt = (x,y) -> lt(order(A),x[1][2], y[1][2]), rev = true)
     return basis
 end
