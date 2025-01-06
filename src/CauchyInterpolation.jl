@@ -1,54 +1,75 @@
 
-function add_rand_point!(vec :: Vector{Int}, p :: Int)
-    while true 
-        point = mod(rand(Int),p)
-        if !(point in vec) 
-            push!(vec,point)
-            return point
-        end
-    end
+struct CIParam{A,B} end 
+
+function ci_param(denisone :: Val{A} = Val(false),
+                  tracer :: Val{B} = Val(false)) where {A,B}
+    return CIParam{A,B}()
 end
 
-# It assumes that A has only one parameter
+denisone(p :: CIParam{A,B}) where {A,B} = A
+tracer(p :: CIParam{A,B}) where {A,B} = B 
 
-function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;denisone :: Val{T} = Val(false)) where T 
+
+# It assumes that A has only one parameter
+# the function f should be called as f(ev(A), ev(arg1...),arg2) where ev evaluates the parameter
+function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;param ::CIParam = ci_param())
+    let ev_args;
     randpoints = Int[]
     npoints = 1
     bound = 1 
     succeeded = false
+    globalstats.counters[:number_evaluation] += 1
+
     let prev_cbl
 
     glen = guess_length(args...)
     nA = evaluate_parameter_algebra(1,A) # first argument is not needed unless there are variables T in A
-    vpoints, vargs = evaluate_parameter_many(glen,randpoints,nA,args;denisone=Val(T))
-    ev_args = Tuple(vargs[i][1] for i in 1:length(args))
-    ev_res = [f(nA,ev_args...)]
+    vpoints, vargs = evaluate_parameter_many(glen,randpoints,nA,args...;denisone=Val(denisone(param)))
+    let vargs = vargs
+        ev_args =ntuple(length(args)) do i
+            vargs[i][1]
+    end; end 
+    if tracer(param)
+        tmp, trace = f(nA,ev_args...;tracer=Val(true))
+        ev_res = [tmp]
+    else 
+        ev_res = [f(nA,ev_args...)]
+    end
     vctr = 2 
     push!(randpoints,vpoints[1])
-    globalstats.counters[:number_evaluation] += 1
+    # globalstats.counters[:number_evaluation] += 1
     t = ctx(A).vars[1]
     prd = t - vpoints[1] # product of the t-randpoints[i], precomputation for cauchy interpolation
 
 
     while true 
         if vctr > glen 
-            vpoints,vargs = evaluate_parameter_many(glen,randpoints,nA,args;denisone=Val(T))
+            vpoints,vargs = evaluate_parameter_many(glen,randpoints,nA,args...;denisone=Val(denisone(param)))
             vctr = 1
         end
         push!(randpoints,vpoints[vctr])
-        ev_args = Tuple(vargs[i][vctr] for i in 1:length(args))
+        let vargs = vargs; let vctr = vctr
+            ev_args =ntuple(length(args)) do i
+                vargs[i][vctr]
+        end; end; end
         prd = prd*(t-vpoints[vctr])
         vctr +=1
         npoints += 1 
 
-
         globalstats.counters[:number_evaluation] += 1
-        @debug "evaluation of t at a point ($(npoints)th)" 
-        push!(ev_res, f(nA,ev_args...))
+
+        # globalstats.counters[:number_evaluation] += 1
+        # @debug "evaluation of t at a point ($(npoints)th)" 
+        if tracer(param)
+            re = f(nA,trace,ev_args...)
+        else
+            re = f(nA,ev_args...)
+        end
+        push!(ev_res, re)
 
         # trying interpolation
         if succeeded 
-            @debug "interpolation to reconstruct stable mon set"
+            # @debug "interpolation to reconstruct stable mon set"
             rcbl = random_cbl(ev_res,nA)
             cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
             if Nemo.denominator(cbl,false) == Nemo.denominator(prev_cbl,false)
@@ -57,36 +78,37 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;d
                 return cauchy_interpolation_known_den(ev_res, randpoints,ev_den,den, A)
             end
             prev_cbl = cbl
-            @debug "reconstructions don't match, trying another point"
+            # @debug "reconstructions don't match, trying another point"
             succeeded = false
         elseif npoints == 2^bound + 1
             try 
-                @debug "interpolation to reconstruct stable mon set"
+                # @debug "interpolation to reconstruct stable mon set"
                 rcbl = random_cbl(ev_res,nA)
                 prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
                 succeeded = true
-                @debug "success, trying one more point"
+                # @debug "success, trying one more point"
             catch 
-                @debug "failure, trying more points"
+                # @debug "failure, trying more points"
             end 
             bound += 1
         end
-        # if npoints ==100
-        #     # println("randpoints")
-        #     # println(randpoints)
-        #     # print("evres")
-        #     # prettyprint(ev_res,nA)
-        #     @debug "interpolation to reconstruct stable mon set"
-        #     rcbl = random_cbl(ev_res,nA)
-        #     prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
-        #     println("random cbl")
-        #     println(prev_cbl)
-        #     succeeded = true
-        #     @debug "success, trying one more point"
-        #     error("fin")
-        # end
+        if npoints ==100
+            # println("randpoints")
+            # println(randpoints)
+            # print("evres")
+            # prettyprint(ev_res,nA)
+            @debug "interpolation to reconstruct stable mon set"
+            rcbl = random_cbl(ev_res,nA)
+            prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
+            println("random cbl")
+            println(prev_cbl)
+            succeeded = true
+            @debug "success, trying one more point"
+            error("fin")
+        end
     end
     end
+end
 end
 
 
@@ -186,10 +208,9 @@ function half_gcd(A :: fpPolyRingElem, B :: fpPolyRingElem)
     R = parent(A)
     n = Nemo.degree(A)
     n2 = Nemo.degree(B)
-    @assert n > n2
     m = div(n,2) + isodd(n)
     if n2 < m 
-        return SMatrix{2,2,fpPolyRingElem}([R(1),R(0),R(0),R(1)])
+        return SMatrix{2,2,fpPolyRingElem}(R(1),R(0),R(0),R(1))
     end
 
     f = R(collect(coefficients(A))[m+1:end])
@@ -201,7 +222,7 @@ function half_gcd(A :: fpPolyRingElem, B :: fpPolyRingElem)
         return M 
     end
     Q, Cp = divrem(Ap,Bp)
-    Mp = SMatrix{2,2,fpPolyRingElem}([R(0),R(1),R(1),-Q])
+    Mp = SMatrix{2,2,fpPolyRingElem}(R(0),R(1),R(1),-Q)
     l = 2*m-Nemo.degree(Bp)
     b = R(collect(coefficients(Bp))[l+1:end])
     c = R(collect(coefficients(Cp))[l+1:end])
@@ -211,7 +232,6 @@ end
 
 function mat_gcd_remainder_with_degree_cond(p :: fpPolyRingElem, q :: fpPolyRingElem, l :: Int) 
     n = Nemo.degree(p)
-    @assert n > Nemo.degree(q)
     v = SVector{2,fpPolyRingElem}(p,q)
     R = parent(p)
 
@@ -395,4 +415,14 @@ function guess_length(args...)
         m = max(m,guess_length(arg))
     end
     return m
+end
+
+function add_rand_point!(vec :: Vector{Int}, p :: Int)
+    while true 
+        point = mod(rand(Int),p)
+        if !(point in vec) 
+            push!(vec,point)
+            return point
+        end
+    end
 end

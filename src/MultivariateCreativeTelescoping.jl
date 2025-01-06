@@ -11,6 +11,7 @@ using FLINT_jll: libflint
 global ord_ctr = 0; # used to create new types with metaprogramming
 include("globalstats.jl")
 include("primes.jl")
+include("DataStructure_missing.jl")
 # include("SLP.jl")
 
 include("TypeCoefficient.jl")
@@ -38,6 +39,8 @@ include("F5.jl")
 
 include("WeylClosure.jl")
 
+include("echelon_form.jl")
+include("Reductions.jl")
 include("RepresentativeInIntMod.jl")
 include("DerivRedMap.jl")
 include("MCT.jl")

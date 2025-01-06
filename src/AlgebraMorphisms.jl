@@ -312,7 +312,12 @@ end
 
 function evaluate_parameter(pol :: OrePoly, point :: Int, A :: OreAlg) 
     T = eltype_co(A)
-    ncoeffs = T[T(evaluate(c,point).data) for c in coeffs(pol)]
+    cos = coeffs(pol)
+    len = length(cos)
+    ncoeffs = Vector{T}(undef,len)
+    for i in 1:len
+        ncoeffs[i] =convertn(evaluate(cos[i],point).data,ctx(A))
+    end
     return OrePoly(ncoeffs,deepcopy(mons(pol)))
 end
     
@@ -350,8 +355,10 @@ end
 function evaluate_parameter_many(glen :: Int, randpoints :: Vector{Int}, nA :: OreAlg, args...;denisone ::Val{TT}= Val(false)) where TT
     vpoints = new_rand_points(randpoints,Int(char(nA)),glen)
     _vpoints = [UInt(p) for p in vpoints]
-    # println(length(args), " ",typeof(args[1]))
-    return vpoints, Tuple(evaluate_parameter_many(arg,_vpoints,nA;denisone=Val(TT)) for arg in args...)
+    t =  ntuple(length(args)) do i
+        evaluate_parameter_many(args[i],_vpoints,nA;denisone=Val(TT))
+    end
+    return vpoints, t
 end
 
 
@@ -484,6 +491,9 @@ function evaluate_parameter_many(mat :: Generic.MatSpaceElem{Generic.FracFieldEl
         res[l] = evmat
     end
     return res
+end
+function evaluate_parameter_many(p :: MCTParam, v :: Vector{UInt}, nA :: OreAlg;denisone ::Val{T}= Val(false)) where T
+    return [p for i in 1:length(v)] 
 end
 
 # function evaluate_parameter(g :: Vector{Vector{OrePoly{T,M}}}, point :: Int,  A :: OreAlg) where  {T,M}

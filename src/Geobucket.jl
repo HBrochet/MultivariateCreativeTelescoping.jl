@@ -216,104 +216,6 @@ function lt(g :: GeoBucket, A :: OreAlg)
     end
 end
 
-# this new type is just here to create a custom iterator needed in addmul_geobucket 
-struct itr_mon{N,E}
-    m  :: SVector{N,E}
-    nrdv :: Int
-    npdv :: Int 
-end
-
-function Base.iterate(m::itr_mon{N,E}) where {N,E}
-    return (OreMonVE{N,E}(m.m),m.m)
-end
-
-function Base.iterate(m::itr_mon{N,E},v :: SVector{N,E}) where {N,E}
-    j = m.nrdv+1
-    bound = m.nrdv +m.npdv 
-    while j <= bound
-        if v[j] > 0
-            d = gen_mon(j, m,v)
-            return (OreMonVE{N,E}(d),d)
-        end
-        j += 1
-    end
-    return nothing 
-end
-
-# I get type unstability if the svector creation is not embed in a function ??? 
-function gen_mon(j :: Int,m::itr_mon{N,E},v :: SVector{N,E}) where {N,E}
-    return SVector{N,E}(i < j ? m.m[i] : (i == j) ? v[i] - E(1) : v[i] for i in 1:N)
-end
-
-
-
-
-
-
-# add the product c*m*f to g  
-function addmul_geobucket!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg ) where {K,M}
-    for (l,mm) in enumerate(itr_mon(m.exp,A.nrdv,A.npdv)) 
-        siz = guess_size(mm,m,f,A)
-        i =  int_log_upper(4,siz)
-        if i > length(g)
-            grow_to!(g,i)
-        end
-
-        res = inactive_tab(g,i)
-        tab = active_tab(g,i)
-
-        # starting to merge in res the array tab with another array computed on the fly 
-        (co,mo,i_f) = addmul_geobucket_next_term(length(f),c,m, mm, f, A) # terms computed on the fly
-        if i_f < 0 
-            continue 
-        end
-
-        leng = g.indices[i] 
-        ig = 1
-        mg = mon(tab,ig)
-        w = 1
-
-        while ig <= leng && i_f >= 0
-            mg = mon(tab,ig)
-            if lt(order(A),mg,mo)
-                res[w] = tab[ig]
-                ig += 1 
-                w +=1
-            elseif mo == mg 
-                cc = add(co, coeff(tab,ig),ctx(A))
-                if !iszero(cc,ctx(A))
-                    res[w] = (cc,mo)
-                    w += 1 
-                end
-                (co, mo, i_f) = addmul_geobucket_next_term(i_f,c,m, mm, f, A)
-                ig += 1
-            else 
-                res[w] = (co,mo)
-                (co, mo, i_f) = addmul_geobucket_next_term(i_f,c,m, mm, f, A)
-                w += 1
-            end
-        end
-        while ig <= leng
-            res[w] = tab[ig]
-            ig += 1 
-            w += 1 
-        end
-
-        while i_f >= 0
-            res[w] = (co,mo)
-            (co, mo, i_f) = addmul_geobucket_next_term(i_f,c,m, mm, f, A)
-            w += 1
-        end
-
-
-        g.indices[i] = w-1
-        change_active_tab!(g,i)
-        if w > 4^i + 1
-            add_to_slice_j!(g,i,i+1,A)
-        end
-    end
-    return g
-end
 
 function add_to_slice_j!(g :: GeoBucket,i :: Int, j :: Int, A :: OreAlg)
     if j > length(g)
@@ -373,7 +275,124 @@ function add_to_slice_j!(g :: GeoBucket,i :: Int, j :: Int, A :: OreAlg)
     return g
 end
 
-function addmul_geobucket_next_term(i_f :: Int,c :: K, m::M, mm :: M, f :: OrePoly, A::OreAlg) where {K,M}
+function add!(g :: GeoBucket,co ::T, p :: OrePoly,A :: OreAlg) where T
+    j =  int_log_upper(4,length(p))
+    if j > length(g)
+        grow_to!(g,j)
+    end
+
+    res = inactive_tab(g,j)
+    tabj = active_tab(g,j)
+
+    # merge 
+    jlen = g.indices[j] 
+    ip = length(p)
+    ij = 1 
+    w = 1 # writing index 
+    
+    while (ip >=1) && (ij <= jlen)
+        mp = mon(p,ip)
+        mj = mon(tabj,ij)
+        if lt(order(A),mp,mj)
+            c = mul(co,coeff(p,ip),ctx(A))
+            res[w] = (c,mp)
+            ip -=1 
+            w += 1 
+        elseif mp == mj  
+            c = add(mul(co,coeff(p,ip),ctx(A)), coeff(tabj,ij),ctx(A))
+            if !iszero(c,ctx(A))
+                res[w] = (c, mp)
+                w +=1 
+            end
+            ip -= 1 
+            ij += 1 
+
+        else 
+            res[w] = tabj[ij]
+            ij += 1 
+            w += 1 
+        end
+    end
+    while ip >= 1 
+        c = mul(co,coeff(p,ip),ctx(A))
+        mp = mon(p,ip)
+        res[w] = (c,mp)
+        ip -= 1 
+        w += 1 
+    end
+    while ij <= jlen 
+        res[w] = tabj[ij]
+        ij +=1 
+        w += 1 
+    end
+    g.indices[j] = w - 1
+    change_active_tab!(g,j)
+    if w > 4^j + 1 
+        add_to_slice_j!(g,j,j+1,A)
+    end
+    return g
+end
+    
+
+
+
+
+
+
+# add the product c*m*f to g. 
+# The function used depends on the choice of representation of the monomials 
+function addmul_geobucket!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg; mod_der :: Val{B} = Val(false) ) where {K,M,B}
+    if A.varord == "dright" 
+        return addmul_geobucket_dright!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg)
+    else # A.varord = "dleft" 
+        return addmul_geobucket_dleft!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg, mod_der=Val(B))
+    end
+end
+
+# this new type is just here to create a custom iterator needed in addmul_geobucket 
+struct itr_mon_dright{N,E}
+    m  :: SVector{N,E}
+    nrdv :: Int
+    npdv :: Int 
+end
+
+function Base.iterate(m::itr_mon_dright{N,E}) where {N,E}
+    return (OreMonVE{N,E}(m.m),m.m)
+end
+
+function Base.iterate(m::itr_mon_dright{N,E},v :: SVector{N,E}) where {N,E}
+    j = m.nrdv+1
+    bound = m.nrdv +m.npdv 
+    while j <= bound
+        if v[j] > 0
+            d = gen_mon_dright(j, m,v)
+            return (OreMonVE{N,E}(d),d)
+        end
+        j += 1
+    end
+    return nothing 
+end
+
+# I get type unstability if the svector creation is not embed in a function ??? 
+function gen_mon_dright(j :: Int,m::itr_mon_dright{N,E},v :: SVector{N,E}) where {N,E}
+    return SVector{N,E}(i < j ? m.m[i] : (i == j) ? v[i] - E(1) : v[i] for i in 1:N)
+end
+
+function guess_size_dright(mm :: M, m :: M, g :: OrePoly, A :: OreAlg) where M 
+    res = 0 
+    for mmm in mons(g)
+        for i in A.nrdv+1:A.nrdv+A.npdv 
+            if m[i]-mm[i] > mmm[i+A.npdv]
+                @goto next
+            end
+        end
+        res += 1
+        @label next
+    end
+    return res
+end
+
+function addmul_geobucket_next_term_dright(i_f :: Int,c :: K, m::M, mm :: M, f :: OrePoly, A::OreAlg) where {K,M}
 
     while i_f >= 1 
         mf = mon(f,i_f)
@@ -398,7 +417,6 @@ function addmul_geobucket_next_term(i_f :: Int,c :: K, m::M, mm :: M, f :: OrePo
         N = nvars(A)
         mmm = SVector{N,Int16}(i < A.nrdv + A.npdv + 1 || i > A.nrdv + 2*A.npdv ? mf[i] : mf[i] - (m[i-A.npdv] - mm[i-A.npdv]) for i in 1:N)
         mmm = OreMonVE{N,Int16}(mmm)
-        # @assert !iszero(cc)
 
         return (cc,mm*mmm,i_f-1) 
         @label next2
@@ -406,12 +424,108 @@ function addmul_geobucket_next_term(i_f :: Int,c :: K, m::M, mm :: M, f :: OrePo
     return (zero(ctx(A)),makemon(-1,A), -1)
 end
 
+function addmul_geobucket_dright!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg ) where {K,M}
+    for (l,mm) in enumerate(itr_mon_dright(m.exp,A.nrdv,A.npdv)) 
+        siz = guess_size_dright(mm,m,f,A)
+        i =  int_log_upper(4,siz)
+        if i > length(g)
+            grow_to!(g,i)
+        end
 
-function guess_size(mm :: M, m :: M, g :: OrePoly, A :: OreAlg) where M 
+        res = inactive_tab(g,i)
+        tab = active_tab(g,i)
+
+        # starting to merge in res the array tab with another array computed on the fly 
+        (co,mo,i_f) = addmul_geobucket_next_term_dright(length(f),c,m, mm, f, A) # terms computed on the fly
+        if i_f < 0 
+            continue 
+        end
+
+        leng = g.indices[i] 
+        ig = 1
+        mg = mon(tab,ig)
+        w = 1
+
+        while ig <= leng && i_f >= 0
+            mg = mon(tab,ig)
+            if lt(order(A),mg,mo)
+                res[w] = tab[ig]
+                ig += 1 
+                w +=1
+            elseif mo == mg 
+                cc = add(co, coeff(tab,ig),ctx(A))
+                if !iszero(cc,ctx(A))
+                    res[w] = (cc,mo)
+                    w += 1 
+                end
+                (co, mo, i_f) = addmul_geobucket_next_term_dright(i_f,c,m, mm, f, A)
+                ig += 1
+            else 
+                res[w] = (co,mo)
+                (co, mo, i_f) = addmul_geobucket_next_term_dright(i_f,c,m, mm, f, A)
+                w += 1
+            end
+        end
+        while ig <= leng
+            res[w] = tab[ig]
+            ig += 1 
+            w += 1 
+        end
+
+        while i_f >= 0
+            res[w] = (co,mo)
+            (co, mo, i_f) = addmul_geobucket_next_term_dright(i_f,c,m, mm, f, A)
+            w += 1
+        end
+
+
+        g.indices[i] = w-1
+        change_active_tab!(g,i)
+        if w > 4^i + 1
+            add_to_slice_j!(g,i,i+1,A)
+        end
+    end
+    return g
+end
+
+
+# same with dleft
+
+
+# this new type is just here to create a custom iterator needed in addmul_geobucket 
+struct itr_mon_dleft{N,E}
+    m  :: SVector{N,E}
+    nrdv :: Int
+    npdv :: Int 
+end
+
+function Base.iterate(m::itr_mon_dleft{N,E}) where {N,E}
+    return (OreMonVE{N,E}(m.m),m.m)
+end
+
+function Base.iterate(m::itr_mon_dleft{N,E},v :: SVector{N,E}) where {N,E}
+    j = m.nrdv+m.npdv+1
+    bound = m.nrdv + 2*m.npdv 
+    while j <= bound
+        if v[j] > 0
+            d = gen_mon_dleft(j, m,v)
+            return (OreMonVE{N,E}(d),d)
+        end
+        j += 1
+    end
+    return nothing 
+end
+
+# I get type unstability if the svector creation is not embed in a function ??? 
+function gen_mon_dleft(j :: Int,m::itr_mon_dleft{N,E},v :: SVector{N,E}) where {N,E}
+    return SVector{N,E}(i < j ? m.m[i] : (i == j) ? v[i] - E(1) : v[i] for i in 1:N)
+end
+
+function guess_size_dleft(mm :: M, m :: M, g :: OrePoly, A :: OreAlg) where M 
     res = 0 
     for mmm in mons(g)
-        for i in A.nrdv+1:A.nrdv+A.npdv 
-            if m[i]-mm[i] > mmm[i+A.npdv]
+        for i in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv 
+            if m[i]-mm[i] > mmm[i-A.npdv]
                 @goto next
             end
         end
@@ -421,38 +535,109 @@ function guess_size(mm :: M, m :: M, g :: OrePoly, A :: OreAlg) where M
     return res
 end
 
-function guess_sizes(supp :: Vector{M}, m :: M, g :: OrePoly,A :: OreAlg) where M 
-    res = [0 for i in 1:length(supp)]
-    for (j,mm) in enumerate(supp) 
-        for mmm in mons(g)
-            for i in A.nrdv+1:A.nrdv+A.npdv 
-                if m[i]-mm[i] > mmm[i+A.npdv]
-                    @goto next_old
-                end
+function addmul_geobucket_next_term_dleft(i_f :: Int,c :: K, m::M, mm :: M, f :: OrePoly, A::OreAlg) where {K,M}
+
+    while i_f >= 1 
+        mf = mon(f,i_f)
+        for i in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv 
+            if m[i]-mm[i] > mf[i-A.npdv]
+                i_f -=1
+                @goto next2
             end
-            res[j] += 1
-            @label next_old
+        end
+        cc = mul(c,coeff(f,i_f),ctx(A))
+        for i in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv
+            expmx = Int(m[i])
+            expmfd = Int(mf[i - A.npdv]) 
+            j = expmx - mm[i]
+            tmp = binomial(expmx,j)
+            if j != 0 
+                tmp = tmp * prod(expmfd-i for i in 0:j-1)
+            end
+            tmp = convertn(tmp,ctx(A))
+            if isodd(j)
+                tmp = opp(tmp,ctx(A))
+            end
+            cc = mul(cc,tmp,ctx(A))
+        end
+        N = nvars(A)
+        mmm = SVector{N,Int16}(i < A.nrdv + 1 || i > A.nrdv + A.npdv ? mf[i] : mf[i] - (m[i+A.npdv] - mm[i+A.npdv]) for i in 1:N)
+        mmm = OreMonVE{N,Int16}(mmm)
+
+        return (cc,mm*mmm,i_f-1) 
+        @label next2
+    end
+    return (zero(ctx(A)),makemon(-1,A), -1)
+end
+
+
+function addmul_geobucket_dleft!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg; mod_der :: Val{B} = Val(false)) where {K,M,B}
+    for (l,mm) in enumerate(itr_mon_dleft(m.exp,A.nrdv,A.npdv)) 
+        siz = guess_size_dleft(mm,m,f,A)
+        i =  int_log_upper(4,siz)
+        if i > length(g)
+            grow_to!(g,i)
+        end
+
+        res = inactive_tab(g,i)
+        tab = active_tab(g,i)
+
+        # starting to merge in res the array tab with another array computed on the fly 
+        (co,mo,i_f) = addmul_geobucket_next_term_dleft(length(f),c,m, mm, f, A) # terms computed on the fly
+        if i_f < 0 
+            continue 
+        end
+
+        leng = g.indices[i] 
+        ig = 1
+        mg = mon(tab,ig)
+        w = 1
+
+        while ig <= leng && i_f >= 0
+            mg = mon(tab,ig)
+            if lt(order(A),mg,mo)
+                res[w] = tab[ig]
+                ig += 1 
+                w +=1
+            elseif mo == mg 
+                cc = add(co, coeff(tab,ig),ctx(A))
+                if !iszero(cc,ctx(A))
+                    res[w] = (cc,mo)
+                    w += 1 
+                end
+                (co, mo, i_f) = addmul_geobucket_next_term_dleft(i_f,c,m, mm, f, A)
+                ig += 1
+            else 
+                res[w] = (co,mo)
+                (co, mo, i_f) = addmul_geobucket_next_term_dleft(i_f,c,m, mm, f, A)
+                w += 1
+            end
+        end
+        while ig <= leng
+            res[w] = tab[ig]
+            ig += 1 
+            w += 1 
+        end
+
+        while i_f >= 0
+            res[w] = (co,mo)
+            (co, mo, i_f) = addmul_geobucket_next_term_dleft(i_f,c,m, mm, f, A)
+            w += 1
+        end
+
+        g.indices[i] = w-1
+        change_active_tab!(g,i)
+        B && mod_derivatives!(g,i,A)
+        w = g.indices[i]
+        if w > 4^i
+            add_to_slice_j!(g,i,i+1,A)
         end
     end
-    return res
+    return g
 end
 
-function supp_mons(m :: M, A :: OreAlg) where M
-    return supp_mons_rec(m, A.nrdv, A)
-end
 
-function supp_mons_rec(m :: M, l :: Int, A :: OreAlg) where M
-    res = M[] 
-    if l+1 == A.nrdv+A.npdv+1 
-        return [m] 
-    end
-    mm = makemon(l+1,A)
-    for i in 0:m[l+1] 
-        append!(res,supp_mons_rec(m/mm^i,l+1,A))
-    end
-    return res  
-end
-
+###
 
     
 function int_log_upper(d::Int,a::Int)
@@ -515,7 +700,7 @@ function div!(geob :: GeoBucket ,tmp_poly :: ReuseOrePoly,f :: OrePoly, gb :: Ve
             lmon2 = lm(gb[i])
             if iscompatible(lmon2, lmon,A) && divide(lmon2, lmon,A)
                 div = true
-                geob = reduce!(geob, (lco,lmon), gb[i], A)
+                geob = reduce_geob!(geob, (lco,lmon), gb[i], A,Val(false))
                 break
             end
         end
@@ -523,8 +708,18 @@ function div!(geob :: GeoBucket ,tmp_poly :: ReuseOrePoly,f :: OrePoly, gb :: Ve
             push!(tmp_poly,lco,lmon)
             rem_lt!(geob,lmon)
         end
-        # @assert iszero(lt(res,A)[1]) || lmon != lm(res,A)
     end
     # res = normalform(geob,A)
     return copy_to_OrePoly!(tmp_poly,A)
+end
+
+
+function reduce_geob!(g :: GeoBucket, t:: Tuple{K,M}, f :: OrePoly{K,M}, A :: OreAlg, :: Val{B})  where {K, M, B}
+    (c,m) = t # lc and lm of g   
+    themon = m/lm(f) 
+    thectx = ctx(A)
+    thecoeff = opp(mul(c,inv(lc(f),thectx),thectx),thectx)
+
+    addmul_geobucket!(g, thecoeff, themon, f, A, mod_der = Val(B))
+    return g 
 end

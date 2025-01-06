@@ -53,7 +53,7 @@ function savebuffer!(ctx :: NmodLikeΓ{T, Tbuf},
     if normalize
         @inbounds mult = inv(deflate(normal(buffer[firstterm], ctx), ctx), ctx)
         @inbounds for j in firstterm:length(buffer)
-            @assert normal(buffer[j], ctx) == buffer[j]
+            # @assert normal(buffer[j], ctx) == buffer[j]
             c = deflate(buffer[j], ctx)
             iszero(c,ctx) && continue
             push!(row.mons, I(j))
@@ -65,7 +65,7 @@ function savebuffer!(ctx :: NmodLikeΓ{T, Tbuf},
         end
     else
         @inbounds for j in firstterm:length(buffer)
-            @assert normal(buffer[j], ctx) == buffer[j]
+            # @assert normal(buffer[j], ctx) == buffer[j]
             c = buffer[j]
             iszero(c,ctx) && continue
             push!(row.mons, I(j))

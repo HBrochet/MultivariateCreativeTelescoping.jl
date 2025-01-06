@@ -16,7 +16,8 @@ function initglobalstats!()
               :f4_nb_reducer_computed, :f4_nb_reducer_used,:f4_size_reducer,:f4_size_m,:f4_deg_reducer,
               :f5_eliminated_signatures, :f5_candidate_signatures, :f5_size_reducer,:f5_deg_reducer,:f5_number_divisions,
               :f5_eliminated_signatures_stophol,:f5_size_m,
-              :number_primes,:number_evaluation,:number_pol_evaluation]
+              :number_primes,:number_evaluation,:number_pol_evaluation,
+              :mct_red_zero]
         push!(globalstats.counters, p => 0)
     end
 

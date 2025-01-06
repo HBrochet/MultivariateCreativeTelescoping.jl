@@ -142,7 +142,6 @@ function add(ctx::Nmod32xΓ, a::UInt32, b::UInt32)
     c0 = a+b
     c1 = c0 - ctx.char
     d = max(c0, c1)
-    #@assert d%ctx.char == (a%ctx.char + b%ctx.char)%ctx.char
     return d
 end
 

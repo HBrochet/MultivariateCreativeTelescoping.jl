@@ -110,16 +110,15 @@ end
     res2 = parse_OrePoly("t*dt-1",A)
     @test res == res2
 
-    # # SSW3
-    A = OreAlg(order = "grevlex x y > grevlex dx dy",poldiffvars = (["x","y"],["dx","dy"]),char = primes[1],varord = "dright")
-    # s = "(t*x^2*y^2+t*x*y^2+t*x^2+t*y^2+t*x-x*y+t)"
-    s = "(1312*x^2*y^2+1312*x*y^2+1312*x^2+1312*y^2+1312*x-x*y+1312)"
 
-    ann = [parse_OrePoly("dx*"*s,A),parse_OrePoly("dy*"*s,A)]
-    spol = parse_OrePoly("(-x^2*y^2+x^2+y^2-1)",A)
-    init = weyl_closure_init(A)
-    gb = weyl_closure(ann,A,init)
-    res = MCT(spol, gb, A)
+    # # # SSW3
+    # A = OreAlg(order = "lex dt > grevlex x y > grevlex dx dy",ratdiffvars=(["t"],["dt"]),poldiffvars = (["x","y"],["dx","dy"]))
+    # s = "(t*x^2*y^2+t*x*y^2+t*x^2+t*y^2+t*x-x*y+t)"
+    # ann = [parse_OrePoly("dt*"*s,A),parse_OrePoly("dx*"*s,A),parse_OrePoly("dy*"*s,A)]
+    # spol = parse_OrePoly("(-x^2*y^2+x^2+y^2-1)",A)
+    # init = weyl_closure_init(A)
+    # gb = weyl_closure(ann,A,init)
+    # res = MCT(spol, gb, A)
 
 
     

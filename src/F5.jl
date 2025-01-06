@@ -17,7 +17,7 @@ function prebasis(gen :: Vector{OrePoly{T,M}}, A :: OreAlg) where {T, M}
     sgb = SigPair{N, T, M}[]
     for i in 1:length(gen)
         lmon = lm(gen[i])
-        sig = Signature(makemon(-1,A),i)
+        sig = Signature(lmon,i)
         push!(sgb, SigPair(gen[i], sig))
     end
     return sgb
@@ -144,7 +144,7 @@ function sigdiv!(geob :: GeoBucket, tmp_poly :: ReuseOrePoly, redf :: SigPair{N,
             lmon2 = lm(sgb[i])
             if iscompatible(lmon2, lmon,A) && divide(lmon2, lmon,A) && lt(so,mul(lmon/lmon2, sgb[i].sig), sig)
                 div = true
-                geob = reduce!(geob, (lco,lmon), sgb[i], A)
+                geob = reduce_geob!(geob, (lco,lmon), sgb[i], A, Val(false))
                 if stat(param)
                     globalstats.counters[:f5_number_divisions]+=1
                 end
@@ -155,7 +155,6 @@ function sigdiv!(geob :: GeoBucket, tmp_poly :: ReuseOrePoly, redf :: SigPair{N,
             push!(tmp_poly,lco,lmon)
             rem_lt!(geob,lmon)
         end
-        # @assert iszero(lt(res,A)[1]) || lmon != lm(res,A)
     end
     # res = normalform(geob,A)
     res = copy_to_OrePoly!(tmp_poly,A)
@@ -163,13 +162,13 @@ function sigdiv!(geob :: GeoBucket, tmp_poly :: ReuseOrePoly, redf :: SigPair{N,
 end
 
 # version SigPairGB
-function reduce!(g :: GeoBucket, t:: Tuple{K,M}, f :: SigPair, A :: OreAlg)  where {K, M}
+function reduce_geob!(g :: GeoBucket, t:: Tuple{K,M}, f :: SigPair, A :: OreAlg, :: Val{B})  where {K, M, B}
     (c,m) = t # lc and lm of g   
     themon = m/lm(f) 
     thectx = ctx(A)
     thecoeff = opp(mul(c,inv(lc(f),thectx),thectx),thectx)
 
-    addmul_geobucket!(g, thecoeff, themon, f.op, A)
+    addmul_geobucket!(g, thecoeff, themon, f.op, A, mod_der = Val(B))
     return g 
 end
 

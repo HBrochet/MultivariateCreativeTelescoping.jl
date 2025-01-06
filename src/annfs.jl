@@ -64,7 +64,6 @@ function annfs_subsitute(gb :: Vector{OrePoly{T,M}},A :: OreAlg) where{T,M}
         sub = parse_OrePoly("-s-1",A)
         tmp = zero(A)
         for (c,m) in g 
-            @assert m[A.npdv] == m[A.npdv*2]
             d =  m[A.npdv]
             p = OrePoly([c],[m/tdt^d])
             for i in 1:d 

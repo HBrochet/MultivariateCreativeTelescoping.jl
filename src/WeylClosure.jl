@@ -7,7 +7,7 @@ end
 function wc_param(;method ::Val{F} = Val(:f5),
     bound :: Int = 1,
     morestep :: Int  = 0,
-    geobucket ::Val{B} = Val(true),
+    geobucket ::Val{B} = Val(false),
     stophol  :: Val{C} = Val(false),
     stat :: Val{D} = Val(false),
     debug :: Val{E} = Val(false)) where {B,C,D,E,F} 
@@ -66,7 +66,10 @@ function saturation(g :: Vector{OrePoly{T,M}}, i :: Int, A :: OreAlg; param :: W
     tmp = mul(A.pols_loc[1],varT,A)
     tmp = sub(tmp,one(A),A)
     push!(g, tmp)
-    gb, lastpow = init_gb_sat(f5(g,A), bound,i,A)
+    
+
+    gb = f5(g,A,param = param.gb_param)
+    gb, lastpow = init_gb_sat(gb, bound,i,A)
     if method(param) == :buchberger
         gb = Buchberger2(gb,A,param = param.gb_param)
     elseif method(param) == :f4
@@ -141,7 +144,7 @@ function weyl_closure_internal(gens::Vector{OrePoly{T,M}}, A :: OreAlg, init :: 
     nA = init.A
     sl = singular_locus(gens,A,init.SLI)
     if sl == one(A)
-        return f5(gens,A)
+        return f5(gens,A,param = param.gb_param)
     else 
         nemo_p = prod(fact[1] for fact in factor_squarefree(sl) )
         p = OrePoly([nemo_p],[makemon(-1,A)])
