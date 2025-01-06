@@ -4,7 +4,7 @@ struct Signature{N}
 end
 
 
-# Signature(v :: Vector,i :: Int) = Signature{length(v)}(OreMonVE(SVector{length(v)}(map(x -> Int16(x),v))),i)
+Signature(v :: Vector,i :: Int) = Signature{length(v)}(OreMonVE(SVector{length(v)}(map(x -> Int16(x),v))),i)
 
 function Base.lcm(a :: Signature{N}, b :: Signature{N}) where N
     return SVector{N,Int16}([max(a.mon[i],b.mon[i]) for i in 1:N])
@@ -19,8 +19,6 @@ Base.show(io ::IO, ::Vector{SigPair{N,T,M}}) where {N,T,M} = print(io,"Vector of
 
 Base.zero(s::SigPair) = zero(s.op)
 Base.iszero(s::SigPair) = length(s.op) == 0
-Base.iszero(s::SigPair, :: OreAlg) = length(s.op) == 0
-
 lm(s ::SigPair) =  lm(s.op)
 lc(s::SigPair) = lc(s.op)
 
@@ -35,15 +33,6 @@ end
 function Base.length(s :: SigPair)
     return length(s.op)
 end
-
-function zeroSigPair(A ::OreAlg)
-    N = nvars(A)
-    m = OreMonVE(SVector{N,Int16}(Int16(0) for i in 1:N))
-    return SigPair(zero(A),Signature{N}(m,0))
-end
-
-
-
 
 # function iscompatible(a :: SigPair, b :: SigPair, A:: OreAlg)
 #     return iscompatible(mon(a,1),mon(b,1),A)

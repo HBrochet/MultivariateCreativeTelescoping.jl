@@ -73,7 +73,7 @@ end
 
 
 
-function make_order2(s ::String,strvar_to_indexp :: Dict{String,E}, ::Val{M}) where {E, M<:AbsOreMonomial}
+function make_order(s ::String,strvar_to_indexp :: Dict{String,E}, ::Val{M}) where {E, M<:AbsOreMonomial}
     blocs = split(s, ">")
     filter!(b -> length(split(b)) > 1, blocs)
     ord, _ = make_order_rec(blocs,strvar_to_indexp,Val(M))
@@ -168,87 +168,3 @@ function Base.Order.lt(ord :: AbsMonomialOrder, a :: AbsOrePolynomial, b :: AbsO
     end
 end
 
-
-
-##############################
-
-
-function make_order(order ::String,dic :: Dict{String,E}, ::Val{M}) where {E, M<:AbsOreMonomial}
-    A = parse_order(order,dic,Val(M))
-    return create_order(A,Val(M))
-end
-
-function parse_order(s ::String,strvar_to_indexp :: Dict{String,E}, ::Val{M}) where {E, M<:AbsOreMonomial}
-    blocs = split(s, ">")
-    vec = Vector{E}[]
-    for l in blocs 
-        str =  split(strip(l)," ")
-        if length(str) == 1 
-            continue 
-        end
-        append!(vec,ordervec(str,strvar_to_indexp,Val(M)))
-    end
-    return vec
-end
-
-
-function create_order(A :: Vector{Vector{I}},::Val{M}) where {M <: AbsOreMonomial,I <: Integer}
-    N = nvars(M)
-    namestruct = Symbol("Order",ord_ctr)
-    B = adjoint(SMatrix{nvars(M),length(A)}( collect(Iterators.flatten(A))))
-
-    eval(Meta.parse("struct $(namestruct) <: AbsMonomialOrder{$(N)} end"))
-    prog = "function lt(order :: $(namestruct), a :: OreMonVE, b :: OreMonVE)\n"
-
-    for i in 1:length(A)
-        prog *= "t1 = Int16(0)"
-        prog *= prod(["+ a[$(j)]*Int16($(B[i,j]))" for j in 1:nvars(M)])
-        prog *= "\nt2 = Int16(0)"
-        prog *= prod(["+ b[$(j)]*Int16($(B[i,j]))" for j in 1:nvars(M)])
-        prog *= "\nif t1 < t2 
-        return true
-    elseif t1 > t2 
-        return false
-    end\n"
-    end
-    prog *= "return false\n end"
-
-    eval(Meta.parse(prog))
-    global ord_ctr += 1
-    return eval(Meta.parse("$(namestruct)()"))
-end
-
-
-
-
-function makeexp(::Val{M}, i :: Integer) where {N, E , M <: OreMonVE{N,E}}
-    return E[j == i ? E(1) : E(0) for j in 1:N]
-end
-
-function ordervecgrevlex(str :: Vector{SubString{String}},strvar_to_indexp :: Dict{String,E},::Val{M}) where {E, M<:AbsOreMonomial}
-    vec = Vector{E}[]
-    push!(vec, sum([makeexp(Val(M), strvar_to_indexp[str[i]]) for i in 2:length(str)]))
-    append!(vec,[-makeexp(Val(M), strvar_to_indexp[str[i]]) for i in length(str):-1:2])
-    return vec
-end
-
-function orderveclex(str :: Vector{SubString{String}},strvar_to_indexp :: Dict{String,E},::Val{M}) where {E, M<:AbsOreMonomial}
-    return [makeexp(Val(M), strvar_to_indexp[str[i]]) for i in 2:length(str)]
-end
-
-
-
-
-
-
-function ordervec(str :: Vector{SubString{String}},strvar_to_indexp :: Dict{String,E}, ::Val{M}) where {E, M<:AbsOreMonomial}
-    len = length(str)
-    vec = Vector{Vector{E}}
-    if str[1] == "grevlex" 
-        return ordervecgrevlex(str, strvar_to_indexp, Val(M))
-    elseif str[1] == "lex"
-        return orderveclex(str, strvar_to_indexp, Val(M))
-    else
-        error("order not recognised")
-    end
-end

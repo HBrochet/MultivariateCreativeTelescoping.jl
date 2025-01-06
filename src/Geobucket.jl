@@ -25,29 +25,10 @@ function GeoBucket(p :: OrePoly{K,M}) where {K, M<: AbsOreMonomial}
     return GeoBucket{K,M}(tab1,tab2,active_tab_is_1,indices) 
 end
 
-function init_GeoBucket!(g :: GeoBucket, p :: OrePoly)
-    lenp = length(p)
-    l = int_log_upper(4,lenp)
-    if l > length(g) 
-        grow_to!(g,l)
-    end
-    tab = g.tab1[l]
-    for j in 1:lenp
-        tab[lenp-j+1] = p[j]
-    end
-    g.indices[l] = lenp
-    g.active_tab_is_1[l] = true
-    return g
-end
-
 tab1_is_active(g :: GeoBucket, i :: Int) = g.active_tab_is_1[i]
 Base.length(g :: GeoBucket) = length(g.tab1)
 Base.iszero(g :: GeoBucket, i ::Int) = g.indices[i] == 0
  
-Base.show(io::IO, g :: GeoBucket) = print(io,"Geo bucket")
-Base.show(io::IO, ::MIME"text/plain", g :: GeoBucket) = print(io,"Geo bucket")
-
-
 function lm(g :: GeoBucket, i ::Int)
     if tab1_is_active(g,i)
         return mon(g.tab1[i],g.indices[i])
@@ -92,18 +73,6 @@ function grow_to!(g :: GeoBucket{K,M}, l ::Int) where {K,M}
     append!(g.indices,[0 for j in length(g.indices)+1:l])
     nothing
 end
-
-function rem_lt!(g :: GeoBucket, m :: M) where M 
-    indices = g.indices
-    for i in length(g):-1:1 
-        if indices[i] > 0 && lm(g,i) == m
-            indices[i] -= 1 
-            return nothing
-        end
-    end 
-    # should never happen 
-    return nothing 
-end 
 
 function prettyprint(g :: GeoBucket,A :: OreAlg)
     for i in 1:length(g)
@@ -216,45 +185,21 @@ function lt(g :: GeoBucket, A :: OreAlg)
     end
 end
 
-# this new type is just here to create a custom iterator needed in addmul_geobucket 
-struct itr_mon{N,E}
-    m  :: SVector{N,E}
-    nrdv :: Int
-    npdv :: Int 
-end
-
-function Base.iterate(m::itr_mon{N,E}) where {N,E}
-    return (OreMonVE{N,E}(m.m),m.m)
-end
-
-function Base.iterate(m::itr_mon{N,E},v :: SVector{N,E}) where {N,E}
-    j = m.nrdv+1
-    bound = m.nrdv +m.npdv 
-    while j <= bound
-        if v[j] > 0
-            d = gen_mon(j, m,v)
-            return (OreMonVE{N,E}(d),d)
-        end
-        j += 1
-    end
-    return nothing 
-end
-
-# I get type unstability if the svector creation is not embed in a function ??? 
-function gen_mon(j :: Int,m::itr_mon{N,E},v :: SVector{N,E}) where {N,E}
-    return SVector{N,E}(i < j ? m.m[i] : (i == j) ? v[i] - E(1) : v[i] for i in 1:N)
-end
-
-
-
-
-
 
 # add the product c*m*f to g  
 function addmul_geobucket!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg ) where {K,M}
-    for (l,mm) in enumerate(itr_mon(m.exp,A.nrdv,A.npdv)) 
-        siz = guess_size(mm,m,f,A)
-        i =  int_log_upper(4,siz)
+    supp =  supp_mons(m,A) 
+    # supp is a set of monomials 
+    # mf is the sum of multiples OrePoly (f_n)_{n\in supp}
+    # where f_n has a support in n*supp(f)  (this multiplication is commutative, ie exponents are added)
+    # and size sizes[i] if n = supp[i]
+    # these polynomials f_n are added on the fly to g 
+
+    sizes = guess_sizes(supp,m,f,A) 
+
+    ### lets go 
+    for (l,mm) in enumerate(supp) 
+        i =  int_log_upper(4,sizes[l])
         if i > length(g)
             grow_to!(g,i)
         end
@@ -385,8 +330,8 @@ function addmul_geobucket_next_term(i_f :: Int,c :: K, m::M, mm :: M, f :: OrePo
         end
         cc = mul(c,coeff(f,i_f),ctx(A))
         for i in A.nrdv+1:A.nrdv+A.npdv
-            expmd = Int(m[i])
-            expmfx = Int(mf[i + A.npdv]) 
+            expmd = K(m[i])
+            expmfx = K(mf[i + A.npdv]) 
             j = expmd - mm[i]
             tmp = binomial(expmd,j)
             if j != 0 
@@ -407,19 +352,6 @@ function addmul_geobucket_next_term(i_f :: Int,c :: K, m::M, mm :: M, f :: OrePo
 end
 
 
-function guess_size(mm :: M, m :: M, g :: OrePoly, A :: OreAlg) where M 
-    res = 0 
-    for mmm in mons(g)
-        for i in A.nrdv+1:A.nrdv+A.npdv 
-            if m[i]-mm[i] > mmm[i+A.npdv]
-                @goto next
-            end
-        end
-        res += 1
-        @label next
-    end
-    return res
-end
 
 function guess_sizes(supp :: Vector{M}, m :: M, g :: OrePoly,A :: OreAlg) where M 
     res = [0 for i in 1:length(supp)]
@@ -427,11 +359,11 @@ function guess_sizes(supp :: Vector{M}, m :: M, g :: OrePoly,A :: OreAlg) where 
         for mmm in mons(g)
             for i in A.nrdv+1:A.nrdv+A.npdv 
                 if m[i]-mm[i] > mmm[i+A.npdv]
-                    @goto next_old
+                    @goto next 
                 end
             end
             res[j] += 1
-            @label next_old
+            @label next
         end
     end
     return res
@@ -473,58 +405,4 @@ function nozero(g :: GeoBucket, A :: OreAlg)
         end
     end
     return true
-end
-
-
-# It assumes that every pivots have been found
-function reducebasis!(geob :: GeoBucket, tmp_poly :: ReuseOrePoly, f :: Vector{OrePoly{K,M}}, A :: Alg) where {K,M, Alg <:OreAlg}
-    i = 1
-
-    lenf = length(f)
-    
-    while i <= lenf
-        makemonic!(f[i],A)
-        tmp = f[lenf]
-        f[lenf] = f[i]
-        f[i] = tmp
-        gb = @view f[1:lenf-1]
-        f[lenf] = div!(geob, tmp_poly,f[lenf], gb, A)
-        if length(f[lenf]) == 0 
-            lenf = lenf -1 
-            pop!(f)
-        else
-            tmp = f[lenf]
-            f[lenf] = f[i]
-            f[i] = tmp
-            i = i + 1
-        end
-    end
-
-    sort!(f, lt = (x,y) -> lt(order(A),x[1][2], y[1][2]), rev = true)
-end
-
-function div!(geob :: GeoBucket ,tmp_poly :: ReuseOrePoly,f :: OrePoly, gb :: Vector{OrePoly{K,M}}, A :: OreAlg) where {K,M}
-    geob = init_GeoBucket!(geob,f)
-    while true 
-        div = false
-        lco,lmon = lt(geob,A)
-        if iszero(lco)
-            break
-        end
-        for i in length(gb):-1:1
-            lmon2 = lm(gb[i])
-            if iscompatible(lmon2, lmon,A) && divide(lmon2, lmon,A)
-                div = true
-                geob = reduce!(geob, (lco,lmon), gb[i], A)
-                break
-            end
-        end
-        if !div
-            push!(tmp_poly,lco,lmon)
-            rem_lt!(geob,lmon)
-        end
-        # @assert iszero(lt(res,A)[1]) || lmon != lm(res,A)
-    end
-    # res = normalform(geob,A)
-    return copy_to_OrePoly!(tmp_poly,A)
 end

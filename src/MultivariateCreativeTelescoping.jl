@@ -9,7 +9,6 @@ using ExportAll
 
 using FLINT_jll: libflint
 
-global ord_ctr = 0; # used to create new types with metaprogramming
 include("globalstats.jl")
 include("primes.jl")
 # include("SLP.jl")
@@ -47,7 +46,6 @@ include("AlgebraMorphisms.jl")
 include("CRT.jl")
 include("CauchyInterpolation.jl")
 
-include("annfs.jl")
 include("testfunctions.jl")
 # include("IndicialEqs.jl")
 @exportAll()
