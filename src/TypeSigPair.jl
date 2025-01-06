@@ -17,10 +17,6 @@ end
 Base.show(io ::IO, ::SigPair) = print(io,"SigPair")
 Base.show(io ::IO, ::Vector{SigPair{N,T,M}}) where {N,T,M} = print(io,"Vector of SigPairs")
 
-Base.zero(s::SigPair) = zero(s.op)
-Base.iszero(s::SigPair) = length(s.op) == 0
-lm(s ::SigPair) =  lm(s.op)
-lc(s::SigPair) = lc(s.op)
 
 function mon(s :: SigPair, i :: Int)
     return mon(s.op,i)
@@ -100,7 +96,7 @@ function Base.:(==)(s :: SigPair, ss :: SigPair)
 end
 
 function Base.copy(s :: SigPair)
-    return SigPair(copy(s.op),s.sig)
+    return SigPair(copy(s.wp),s.sig)
 end
 
 function emptysigpair(A :: OreAlg)

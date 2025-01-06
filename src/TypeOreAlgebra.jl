@@ -434,12 +434,3 @@ end
 function leadingterms(v :: Vector{OrePoly{T,M}}) where {T,M}
     return [OrePoly([coeff(p,1)],[mon(p,1)]) for p in v]
 end
-
-function is_polynomial(m ::OreMonVE,A :: OreAlg)
-    for i in 1:A.nrdv +A.npdv
-        if m[i] != 0 
-            return false 
-        end
-    end
-    return true 
-end

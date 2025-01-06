@@ -18,9 +18,6 @@ Base.show(io::IO, ::MIME"text/plain", v :: Vector{OrePoly{T,M}}) where {T,M} = p
 
 mons(P :: OrePoly) = P.mons 
 Base.@propagate_inbounds mon(P :: OrePoly, i :: Integer) = P.mons[i]
-Base.@propagate_inbounds lm(P :: OrePoly) = P.mons[1]
-Base.@propagate_inbounds lc(P :: OrePoly) = P.coeffs[1]
-
 coeffs(P :: OrePoly) = P.coeffs
 Base.@propagate_inbounds coeff(P :: OrePoly, i :: Integer) = P.coeffs[i]
 
@@ -34,8 +31,7 @@ Base.size(P :: OrePoly) = size(coeffs(P))
 Base.copy(P::OrePoly) = OrePoly(copy(coeffs(P)),copy(mons(P)))
 
 Base.@propagate_inbounds Base.getindex(P :: OrePoly, i :: Integer) = (getindex(P.coeffs, i), getindex(P.mons, i))
-Base.popfirst!(P :: OrePoly) = (popfirst!(P.coeffs),pôpfirst!(P.mons))
-Base.zero(p :: OrePoly{K,M})  where {K,M} = OrePoly(K[],M[])
+ 
 function Base.resize!(P :: OrePoly, r) 
     resize!(P.coeffs, r) 
     resize!(P.mons,r)
@@ -49,5 +45,3 @@ end
 function degree(p :: OrePoly)
     return maximum([degree(m[2]) for m in p])
 end
-
-
