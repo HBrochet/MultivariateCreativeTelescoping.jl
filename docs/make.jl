@@ -13,6 +13,7 @@ makedocs(sitename="MultivariateCreativeTelescoping.jl",
             "Ore algebra" => "OreAlgebra.md",
             "Multivariate Creative Telescoping" =>"MCT.md",
             "Other functionalities" => "OtherFunctionalities.md",
+            "Applications" => "Applications.md"
 
         ],
         checkdocs=:none
