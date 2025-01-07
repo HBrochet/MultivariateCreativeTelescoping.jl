@@ -31,9 +31,9 @@ mutable struct PartialGB{T,M, Alg,B,C,D}
     ) where {T, M, Alg <: OreAlg,B,C,D}
         gens = copy(generators)
         #reducebasis!(gens,A)
-        interreduce(A,gens,param)
+        gens2 = interreduce(A,gens,param)
         new(A, OrePoly{T,M}[],
-            BitSet(), gens, OrePoly{T,M}[], Vector{Spair{M}}(),param)
+            BitSet(), gens2, OrePoly{T,M}[], Vector{Spair{M}}(),param)
     end
 end
 
@@ -178,7 +178,7 @@ function selectspairs!(pgb :: PartialGB)
     deg = max_deg_block(last(pgb.spairs).lcm,pgb.alg)
 
     ctr = 0 
-    while !isempty(pgb.spairs) && ctr < 1
+    while !isempty(pgb.spairs) && ctr < 1000
         sp = last(pgb.spairs)
         if max_deg_block(sp.lcm,pgb.alg) > deg 
             break 
@@ -197,6 +197,7 @@ function selectspol!(pgb :: PartialGB)
     sort!(pgb.spairs, rev=true, order=order(pgb.alg))
     
     sp =  pop!(pgb.spairs)
+
     l = pgb.basis[sp.left]
     r = pgb.basis[sp.right]
     lcm = sp.lcm 
@@ -222,6 +223,7 @@ function findnewrels!(pgb :: PartialGB)
 
     debug(pgb.param) && @debug "reducing a sparse $(length(mx.rows))×$(mx.nbcolumns) matrix"
     reduce!(mx,pgb.param)
+    reducenewpivots!(mx,pgb.param)
     pgb.newrels = [row(mx, r) for r in mx.newpivots]
 
     empty!(pgb.candidates)
@@ -256,7 +258,7 @@ function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param(
 
     stophol(param) && isholonomic(pgb.basis,A) && delete_op_with_T!(pgb.basis,A)
     basis = interreduce(A, [pgb.basis[i] for i in pgb.active],param)
-    reducebasis!(basis,A)
+    # reducebasis!(basis,A)
     sort!(basis, lt = (x,y) -> lt(order(A),x[1][2], y[1][2]), rev = true)
     return basis
 end
@@ -272,12 +274,11 @@ function Buchberger2(gens_ :: Vector{OrePoly{K,M}}, A :: Alg;param ::F4Param = f
             debug(param) && @debug "The current partial gb generates a holonomic ideal"
             delete_spairs_with_T!(pgb,A)
         end
-        #println("new round",stophol,isholonomic(pgb.basis,A))
         round += 1
         debug(param) && @debug "starting round $round, there are $(length(pgb.spairs)) spairs to be treated"
+
         generatespairs!(pgb)
         spol = selectspol!(pgb)
-        # prettyprint(spol,A)
         if iszero(spol) 
             debug(param) && @debug "S-polynom is zero"
             continue
@@ -285,11 +286,13 @@ function Buchberger2(gens_ :: Vector{OrePoly{K,M}}, A :: Alg;param ::F4Param = f
         
         debug(param) && @debug "reducing S-polynom with lm $(lm(spol).exp)"
         spol = div!(spol,pgb.basis,A,param=param)
-        # println("result")
-        # prettyprint(spol,A)
+
         if !iszero(spol)
-            push!(pgb.newrels,spol)
+            makemonic!(spol,A)
+            push!(pgb.newrels,spol) 
         end
+
+
         debug(param) && @debug "found $(length(pgb.newrels)) new relation"
     end
 

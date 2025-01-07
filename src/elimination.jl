@@ -108,7 +108,6 @@ function elementary_reduction_in_buffer(mx::NmodF4Matrix{I, T, Tbuf},
     return true
 end
 
-
 function reduce!(mx::NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, I}
     #@assert all([i == 0 ? true : ismonic(mx.rows[i]) for i in mx.pivots])
 
@@ -146,12 +145,38 @@ function reduce!(mx::NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, 
                 mx.rows[i] = savebuffer!(ctx(mx.A), buffer, row, leadingterm, false)      
             end
         else
-            mx.rows[i] = OrePoly(T[],I[]) # pourquoi a-t-on besoin de ça ? 
+            mx.rows[i] = OrePoly(T[],I[])
         end
     end
     return
 end
 
+
+function reduce_full_known_pivots!(mx::NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, I}
+    #@assert all([i == 0 ? true : ismonic(mx.rows[i]) for i in mx.pivots])
+    
+    buffer = Vector{Tbuf}(undef, mx.nbcolumns)
+    # iter = 0 
+    for (i, row) in enumerate(mx.rows)
+        if isempty(row) || ispivot(mx, i)
+            continue
+        end
+
+        fillbuffer!(buffer, row, ctx(mx.A))
+
+        leadingterm = 0
+
+        # top reduction
+        for j in mon(row,1):mx.nbcolumns
+            b = elementary_reduction_in_buffer(mx, buffer, j,param)
+            if !b && leadingterm == 0 
+                leadingterm = j 
+            end
+        end
+        mx.rows[i] = savebuffer!(ctx(mx.A), buffer, row, leadingterm, false) # todo: remember the lt and remove this call for zero reduction
+    end
+    return
+end
 
 function reducepivots!(mx :: NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, I}
 
@@ -172,6 +197,22 @@ function reducepivots!(mx :: NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T
     end
 end
 
+function reducenewpivots!(mx :: NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, I}
+
+    buffer = Vector{Tbuf}(undef, mx.nbcolumns)
+
+    piv = [mon(mx.rows[p],1) for p in mx.newpivots]
+    sort!(piv,rev=true)
+    @inbounds for p in piv
+        row = mx.rows[mx.pivots[p]]
+        fillbuffer!(buffer, row, ctx(mx.A))
+
+        for j in mon(row,2):mx.nbcolumns
+            elementary_reduction_in_buffer(mx, buffer, j,param)
+        end
+        mx.rows[mx.pivots[p]] = savebuffer!(ctx(mx.A), buffer, row, p, false)        
+    end
+end
 
 
 # #. Interreduction of Gröbner bases
@@ -192,8 +233,10 @@ function interreduce(alg :: OreAlg,
     mx = interreductionmx(alg, pols,param)
     if fullreduction
         reducepivots!(mx,param)
+        reduce_full_known_pivots!(mx,param)
+    else 
+        reduce!(mx,param)
     end
-    reduce!(mx,param)
 
 
     # It is important here that a polynomial in `pols` is not chosen as pivots

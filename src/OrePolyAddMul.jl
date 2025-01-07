@@ -423,6 +423,7 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K2,M}, A :: OreAlg) where {M,K,K2}
         end
 
         res = undefOrePoly(s,A)
+
         res[1] = (mul(T1[1],T2[1],ctx(A)), T1[2] * T2[2])
 
         w = 2 # write index in res

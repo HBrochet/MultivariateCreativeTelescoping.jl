@@ -157,6 +157,11 @@ function printmon(m :: OreMonVE{N,E}, A :: OreAlg) where {N,E}
     end
 end
 
+
+function printmon(m :: Int, A :: OreAlg)
+    print(m)
+end
+
 """
     prettyprint(p :: OrePoly,A ::OreAlg)
 
