@@ -68,15 +68,16 @@ function saturation(g :: Vector{OrePoly{T,M}}, i :: Int, A :: OreAlg; param :: W
     push!(g, tmp)
     
 
-    gb = f5(g,A,param = param.gb_param)
-    gb, lastpow = init_gb_sat(gb, bound,i,A)
+   
     if method(param) == :buchberger
-        gb = Buchberger2(gb,A,param = param.gb_param)
+        gb = Buchberger2(g,A,param = param.gb_param)
     elseif method(param) == :f4
-        gb = f4(gb,A,param = param.gb_param)
+        gb = f4(g,A,param = param.gb_param)
     else
-        gb = f5(gb,A,param = param.gb_param)
+        gb = f5(g,A,param = param.gb_param)
     end
+    gb, lastpow = init_gb_sat(gb, bound,i,A)
+
     res = filter(p -> mon(p,1)[i] == 0, gb) 
     debug(param) && @debug "gb initialized, it contains $(length(gb)) vectors"
     hol = isholonomic(res,A)
