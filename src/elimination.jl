@@ -47,7 +47,6 @@ function savebuffer!(ctx :: NmodLikeΓ{T, Tbuf},
                     firstterm,
                     normalize :: Bool) where {T, Tbuf,I}
 
-
     row = OrePoly(T[],I[])
 
     if normalize
@@ -164,16 +163,11 @@ function reduce_full_known_pivots!(mx::NmodF4Matrix{I, T, Tbuf},param :: F4Param
 
         fillbuffer!(buffer, row, ctx(mx.A))
 
-        leadingterm = 0
-
         # top reduction
         for j in mon(row,1):mx.nbcolumns
             b = elementary_reduction_in_buffer(mx, buffer, j,param)
-            if !b && leadingterm == 0 
-                leadingterm = j 
-            end
         end
-        mx.rows[i] = savebuffer!(ctx(mx.A), buffer, row, leadingterm, false) # todo: remember the lt and remove this call for zero reduction
+        mx.rows[i] = savebuffer!(ctx(mx.A), buffer, row, mon(row,1), false) # todo: remember the lt and remove this call for zero reduction
     end
     return
 end
@@ -241,6 +235,7 @@ function interreduce(alg :: OreAlg,
 
     # It is important here that a polynomial in `pols` is not chosen as pivots
     # if its leading term is reducible.
+    # prettyprint(mx.rows,alg)
     pols = [row(mx, i) for i in mx.inputrows]
 
     filter!(p -> !isempty(p), pols)
