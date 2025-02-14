@@ -256,8 +256,9 @@ function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param(
         debug(param) && @debug "found $(length(pgb.newrels)) new relations"
     end
 
-    stophol(param) && isholonomic(pgb.basis,A) && delete_op_with_T!(pgb.basis,A)
-    basis = interreduce(A, [pgb.basis[i] for i in pgb.active],param)
+    basis = [pgb.basis[i] for i in pgb.active]
+    stophol(param) && isholonomic(basis,A) && delete_op_with_T!(basis,A)
+    basis = interreduce(A, basis,param)
     # reducebasis!(basis,A)
     sort!(basis, lt = (x,y) -> lt(order(A),x[1][2], y[1][2]), rev = true)
     return basis
