@@ -92,27 +92,27 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;p
             end 
             bound += 1
         end
-        if npoints ==100
-            # println("randpoints")
-            # println(randpoints)
-            # print("evres")
-            # prettyprint(ev_res,nA)
-            @debug "interpolation to reconstruct stable mon set"
-            rcbl = random_cbl(ev_res,nA)
-            prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
-            println("random cbl")
-            println(prev_cbl)
-            succeeded = true
-            @debug "success, trying one more point"
-            error("fin")
-        end
+        # if npoints ==100
+        #     # println("randpoints")
+        #     # println(randpoints)
+        #     # print("evres")
+        #     # prettyprint(ev_res,nA)
+        #     @debug "interpolation to reconstruct stable mon set"
+        #     rcbl = random_cbl(ev_res,nA)
+        #     prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
+        #     println("random cbl")
+        #     println(prev_cbl)
+        #     succeeded = true
+        #     @debug "success, trying one more point"
+        #     error("fin")
+        # end
     end
     end
 end
 end
 
 
-function cauchy_interpolation(v :: Vector{UInt32}, points :: Vector{Int}, A :: OreAlg; prd ::fpPolyRingElem = Nothing)
+function cauchy_interpolation(v :: Vector{UInt32}, points :: Vector{Int}, A :: OreAlg; prd ::Union{fpPolyRingElem,Nothing} = nothing)
     R = base_ring(ctx(A).R) 
     ev = [R(Int(c)) for c in v]
     evp = [R(p) for p in points]
@@ -121,30 +121,29 @@ function cauchy_interpolation(v :: Vector{UInt32}, points :: Vector{Int}, A :: O
     return ctx(A).F(num) / ctx(A).F(den)
 end
 
-# not used anymore since I use many = true
-function cauchy_interpolation(pol :: Vector{OrePoly{K,M}}, points :: Vector{Int}, A :: OreAlg; prd ::fpPolyRingElem = Nothing) where {K,M}
-    cs = Vector{eltype_co(A)}(undef,length(pol[1]))
+# S must be a univariate polynomial ring
+# specific for multivariate_interpolation2: the coeffcient type of of the output is AbstractAlgebra.Generic.FracFieldElem{fpPolyRingElem}
+function cauchy_interpolation_mri(pol :: Vector{OrePoly{K,M}}, points :: Vector{T},S :: Ring, A :: OreAlg; prd ::Union{fpPolyRingElem,Nothing} = nothing, bounds :: Union{Vector{Int},Nothing} = nothing) where {K,M,T}
+    cs = Vector{Generic.FracFieldElem{fpPolyRingElem}}(undef,length(pol[1]))
     ms  = mons(pol[1])
-    bound = div(length(points), 2)
-    S = ctx(A).R
     R = base_ring(S)
-
-    F = ctx(A).F
-    var = ctx(A).vars[1]
+    F = fraction_field(S)
+    var = gen(S)
     for i in 1:length(pol[1])
         ev_pol = [R(Int(coeff(pol[j],i))) for j in 1:length(pol)]
         ev_points = [R(p) for p in points]
-
-        num, den = cauchy_interpolation(S,vary, ev_points, ev_pol, bound,prd = prd)
-
-        num = sum([F(cc.data)*var^i for (i,c) in enumerate(coefficients(num)) for cc in coefficients(c)])
-        den = sum([F(cc.data)*var^i for (i,c) in enumerate(coefficients(den)) for cc in coefficients(c)])
-        cs[i] = num/den 
+        if isnothing(bounds)
+            bound = div(length(points), 2)
+        else
+            bound = bounds[i]
+        end
+        num, den = cauchy_interpolation(S,var, ev_points, ev_pol, bound,prd = prd)
+        cs[i] = F(num)/F(den) 
     end
     return OrePoly(cs,ms)
 end
 
-function cauchy_interpolation(vec :: Vector{Dict{M,OrePoly{T,M}}}, randpoints :: Vector{Int}, A :: OreAlg; prd ::fpPolyRingElem = Nothing) where {T,M}
+function cauchy_interpolation(vec :: Vector{Dict{M,OrePoly{T,M}}}, randpoints :: Vector{Int}, A :: OreAlg; prd ::Union{fpPolyRingElem,Nothing} = nothing)  where {T,M}
     res = Dict{M,OrePoly{eltype_co(A),M}}()
     for m in keys(vec[1])
         tmp = [vec[i][m] for i in 1:length(randpoints)]
@@ -153,20 +152,21 @@ function cauchy_interpolation(vec :: Vector{Dict{M,OrePoly{T,M}}}, randpoints ::
     return res 
 end
 
-function cauchy_interpolation(vec :: Vector{Tuple{Dict{M,OrePoly{T,M}}, OrePoly{T,M}}}, randpoints :: Vector{Int}, A :: OreAlg; prd ::fpPolyRingElem = Nothing) where {T,M}
+function cauchy_interpolation(vec :: Vector{Tuple{Dict{M,OrePoly{T,M}}, OrePoly{T,M}}}, randpoints :: Vector{Int}, A :: OreAlg; prd ::Union{fpPolyRingElem,Nothing} = nothing) where {T,M}
     return cauchy_interpolation([vec[i][1] for i in 1:length(vec)], randpoints, A,prd = prd), cauchy_interpolation([vec[i][2] for i in 1:length(vec)], randpoints, A,prd = prd)
 end
 
 
 # x :: points 
 # y :: evaluated rational function at points
-function cauchy_interpolation(S::PolyRing,var ::TT, x::Vector{T}, y::Vector{T},bound ::Int; prd ::fpPolyRingElem = Nothing) where {TT <: RingElement, T <: RingElement}
+function cauchy_interpolation(S::PolyRing,var ::TT, x::Vector{T}, y::Vector{T},bound ::Int; prd ::Union{fpPolyRingElem,Nothing} = nothing) where {TT <: RingElement, T <: RingElement}
     if isnothing(prd)
-        prevR = prod([var-xi for xi in x])
+        prevR = prod(var-xi for xi in x)
     else 
         prevR = prd 
     end   
-     R = interpolate(S,x,y)
+
+    R = interpolate(S,x,y)
 
     #fast approach 
     R0 = prevR
@@ -230,6 +230,7 @@ function half_gcd(A :: fpPolyRingElem, B :: fpPolyRingElem)
     return Mpp*Mp*M
 end
 
+# returns the first matrix st M(p,q) = (R1,R2) with deg(R1) >= l and deg(R2) < l
 function mat_gcd_remainder_with_degree_cond(p :: fpPolyRingElem, q :: fpPolyRingElem, l :: Int) 
     n = Nemo.degree(p)
     v = SVector{2,fpPolyRingElem}(p,q)

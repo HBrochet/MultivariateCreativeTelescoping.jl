@@ -143,3 +143,66 @@ end
     res = compute_with_cauchy_interpolation(foo,A,p)
     @test res == parse_OrePoly("t^2",A)
 end
+
+### test for mri 
+
+
+# global ctr = 0
+
+# A = OreAlg(order = "grevlex x y dx dy",poldiffvars=(["x","y"],["dx","dy"]),ratvars=["s","t"],char=primes[1])
+
+# p = parse_OrePoly("s^2*(t+1)/(s+1)/(t+2)*y^2 + (t^2+1)*(s+1)/(s^4*t +1)",A)
+
+# q = parse_OrePoly("s^2*(t+1)/(s+1)/(t+2)*y^2 + (t^2+1)*(s+1)/(s^4*t)",A)
+
+# q0 = parse_OrePoly("s^2*(t+1)",A)
+# q0b = parse_OrePoly("t^2*(s+1)",A)
+
+
+# q1 = parse_OrePoly("s^2*(t+1)/t^7",A)
+
+# r = parse_OrePoly("1/s",A)
+
+# s = parse_OrePoly("(s^2 + t^2) /(s^3 - t^2*s)",A)
+
+# t = parse_OrePoly("((s+1)^2 + (t+1)^2)/((s+1)^3 - (t+1)^2*(s+1))",A) # 31
+
+# u = parse_OrePoly("t*(s+1)^10/(t+1)^15",A) #378
+
+# v = parse_OrePoly("1/(s^2*t^2)",A) # 23 ?? 
+
+# function test(A,p)
+#     global ctr += 1
+#     return p
+# end
+
+# res = multivariate_rational_interpolation(test,A,q0)
+
+
+
+## mri coupled with a GB calculation 
+
+# using MultivariateCreativeTelescoping
+# s = "[-e*m1^2*x1^2-e*m1^2*x1*x2+e*m2^2*x1^2+e*m2^2*x1*x2-e*t*x1^2+e*t*x1*x2+m1^2*x1^2+m1^2*x1*x2+m2^2*x1^2+3*m2^2*x1*x2+2*m2^2*x2^2-t*x1^2-t*x1*x2+(m1^2*x1^3+2*m1^2*x1^2*x2+m1^2*x1*x2^2+m2^2*x1^2*x2+2*m2^2*x1*x2^2+m2^2*x2^3-t*x1^2*x2-t*x1*x2^2)*dx2, e*m1^2*x1*x2+e*m1^2*x2^2-e*m2^2*x1*x2-e*m2^2*x2^2+e*t*x1*x2-e*t*x2^2+2*m1^2*x1^2+3*m1^2*x1*x2+m1^2*x2^2+m2^2*x1*x2+m2^2*x2^2-t*x1*x2-t*x2^2+(m1^2*x1^3+2*m1^2*x1^2*x2+m1^2*x1*x2^2+m2^2*x1^2*x2+2*m2^2*x1*x2^2+m2^2*x2^3-t*x1^2*x2-t*x1*x2^2)*dx1, -x1*x2*e-x1*x2+(m1^2*x1^2+m1^2*x1*x2+m2^2*x1*x2+m2^2*x2^2-t*x1*x2)*dt]"
+# s2 = "(x2+x1)*(m1^2*x1^2+m1^2*x1*x2+m2^2*x1*x2+m2^2*x2^2-t*x1*x2)"
+
+# A = OreAlg(char=primes[1],order = "lex T dt > grevlex x1 x2 > grevlex dx1 dx2",ratdiffvars =(["t"],["dt"]),poldiffvars=(["x1","x2"],["dx1","dx2"]),locvars=(["T"],[s2]),ratvars=["e","m1","m2"],nomul=["dt","T"])
+
+# gens0 = parse_vector_OrePoly(s,A)
+
+# gens = deepcopy(gens0)
+# T = parse_OrePoly("T",A)
+# l = length(gens)
+# for i in 1:l 
+#     push!(gens, mul(T,gens[i],A))
+# end
+# push!(gens, parse_OrePoly(s2*"T-1",A))
+# push!(gens, parse_OrePoly(s2*"T^2-T",A))
+# push!(gens, parse_OrePoly("dt*("*s2*"*T-1)",A))
+
+# param = f5_param(stophol = Val(true))
+
+# gb = f5(gens,A,param=param)
+
+# gb2 = multivariate_rational_interpolation(f5_mri,A,gens,param)
+# gb2 = unflatten(gb2,A)

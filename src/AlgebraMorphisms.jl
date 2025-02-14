@@ -310,6 +310,74 @@ function evaluate_parameter_algebra(p :: Int,A :: OreAlg)
                     A.inp)
 end
 
+
+function evaluate_coeff_algebra(v :: Vector{K} ,A :: OreAlg) where K
+    new_ctx = Nmod32Γ(ctx(A).char)
+    T = eltype1_ctx(new_ctx)
+    M = eltype_mo(A)
+    tmpA = OreAlg{T,typeof(new_ctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
+                    A.indexp_to_strvar,
+                    Dict{String,UInt32}(),
+                    Dict{String,Int}(),
+                    String[],
+                    A.nrdv,
+                    A.npdv,
+                    A.npv,
+                    A.nlv,
+                    OrePoly{T,M}[],
+                    Vector{OrePoly{T,M}}[],
+                    A.nomul,
+                    order(A),
+                    new_ctx,
+                    A.varord,
+                    A.inp)
+    ev_pol_locs = evaluate_coeff(A.pols_loc, v, tmpA)
+    ev_diff_pols_loc = evaluate_coeff(A.diff_pols_loc, v, tmpA)
+    return OreAlg{eltype1_ctx(new_ctx),typeof(new_ctx),eltype_mo(A),eltype_ord(A)}(A.strvar_to_indexp,
+                    A.indexp_to_strvar,
+                    Dict{String,UInt32}(),
+                    Dict{String,Int}(),
+                    String[],
+                    A.nrdv,
+                    A.npdv,
+                    A.npv,
+                    A.nlv,
+                    ev_pol_locs,
+                    ev_diff_pols_loc,
+                    A.nomul,
+                    order(A),
+                    new_ctx,
+                    A.varord,
+                    A.inp)
+end
+
+function evaluate_coeff(pol :: OrePoly, v :: Vector{K}, A :: OreAlg) where K
+    cos = coeffs(pol)
+    len = length(cos)
+    nc = Vector{eltype_co(A)}(undef,len)
+    ct = ctx(A)
+    for i in 1:len 
+        nc[i] = convertn(evaluate(cos[i],v).data,ct)
+    end
+    return OrePoly(nc,mons(pol))
+end
+
+function evaluate_coeff(g :: Vector{OrePoly{T,M}}, v :: Vector{K}, A :: OreAlg)  where {T, M, K}
+    return [evaluate_coeff(a, v, A) for a in g]
+end
+
+function evaluate_coeff(v ::Vector{K}, A :: OreAlg, args...) where K
+    return (evaluate_coeff(arg,v,A) for arg in args)
+end
+
+function evaluate_coeff(g :: Vector{Vector{OrePoly{T,M}}}, v :: Vector{K},  A :: OreAlg) where  {T,M,K}
+    return [evaluate_coeff(a, v, A) for a in g]
+end
+
+function evaluate_coeff(p :: GBParam, v :: Vector{K},  A :: OreAlg) where  {K}
+    return p
+end
+
 function evaluate_parameter(pol :: OrePoly, point :: Int, A :: OreAlg) 
     T = eltype_co(A)
     cos = coeffs(pol)

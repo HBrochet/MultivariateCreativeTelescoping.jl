@@ -208,8 +208,16 @@ Base.zero(ctx :: UnivRatFunModpCtx) = ctx.F(0)
 Base.iszero(x :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = x == ctx.F(0)
 Base.isone(x :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = x == ctx.F(1)
 
-function evaluate(a :: UnivRatFunModp, p :: Int) 
+function evaluate(a :: UnivRatFunModp, p :: T) where T 
+    println(T)
     return Nemo.evaluate(Nemo.numerator(a,false),p)//Nemo.evaluate(Nemo.denominator(a,false),p)
+end
+
+function evaluate(a :: UnivRatFunModp, p :: Vector{T}) where T 
+    if length(p) > 1 
+        error("the vector p has size > 1")
+    end
+    return Nemo.evaluate(Nemo.numerator(a,false),p[1])//Nemo.evaluate(Nemo.denominator(a,false),p[1])
 end
 
 # ratfun mod large p 
@@ -306,6 +314,10 @@ Base.zero(ctx :: RatFunModpCtx) = ctx.F(0)
 
 Base.iszero(x :: RatFunModp, ctx :: RatFunModpCtx) = x == ctx.F(0)
 Base.isone(x :: RatFunModp, ctx :: RatFunModpCtx) = x == ctx.F(1)
+
+function evaluate(a :: RatFunModp, p :: Vector{T}) where T
+    return Nemo.evaluate(Nemo.numerator(a,false),p)//Nemo.evaluate(Nemo.denominator(a,false),p)
+end
 
 # ratfun mod large p 
 

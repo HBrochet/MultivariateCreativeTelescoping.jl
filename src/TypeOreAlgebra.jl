@@ -88,7 +88,7 @@ function OreAlg(;order :: String = "",
                                             varord,
                                             inp)
     
-    (polsloc, diff_pols_loc) = compute_locpol_and_derivs(locvars[2],tmpA)
+    (polsloc, diff_pols_loc) = Base.invokelatest(compute_locpol_and_derivs,locvars[2],tmpA)
 
     nomul_ = [sti[s] for s in nomul]
     return OreAlg{eltype1_ctx(ctx), typeof(ctx),M,typeof(ord)}(sti,
@@ -485,3 +485,21 @@ end
 function max_deg_block(p :: OrePoly, A::OreAlg)
     return max_deg_block(order(A),mon(p,1))
 end
+
+function unflatten(p :: OrePoly{T,K},A :: OreAlg) where {T,K} 
+    res = OrePoly{T,K}[] 
+    (c,m) = p[1]
+    tmp = OrePoly([c],[m])
+    for i in 2:length(p) 
+        if lt(order(A),mon(p,i), mon(tmp,length(tmp)))
+            push!(tmp, p[i])
+        else
+            push!(res, tmp)
+            (c,m) = p[i] 
+            tmp = OrePoly([c],[m])
+        end
+    end
+    push!(res,tmp)
+    return res 
+end
+ 

@@ -52,6 +52,11 @@ include("CauchyInterpolation.jl")
 include("annfs.jl")
 include("testfunctions.jl")
 # include("IndicialEqs.jl")
+
+# include("multivariate_rational_interpolation.jl")
+# include("multivariate_rational_interpolation2.jl")
+include("multivariate_rational_interpolation3.jl")
+
 @exportAll()
 
 end

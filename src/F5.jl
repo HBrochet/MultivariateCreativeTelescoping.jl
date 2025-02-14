@@ -269,4 +269,16 @@ function f5(A :: OreAlg,gen :: Vector{OrePoly{K,M}}; param :: F5Param = f5_param
     return f5(gen,A,param = param)
 end
 
+function f5_mri(A :: OreAlg,gen :: Vector{OrePoly{K,M}}, param :: F5Param) where {K,M}
+    # flatten the result to allow rational reconstruction with mri 
+    tmp =  f5(gen,A,param = param)
+    res = tmp[1]
+    for i in 2:length(tmp)
+        append!(res,tmp[i])
+    end
+    return res 
+end
+
+
+
 

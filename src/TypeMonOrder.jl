@@ -135,20 +135,20 @@ end
 
 
 
-@generated function lt(t::AbsMonomialOrder{N}, e::SVector{N,E}, f::SVector{N,E}) where {N,E}
-    quote
-        oe = ordervector(t, e)
-        of = ordervector(t, f)
+# @generated function lt(t::AbsMonomialOrder{N}, e::SVector{N,E}, f::SVector{N,E}) where {N,E}
+#     quote
+#         oe = ordervector(t, e)
+#         of = ordervector(t, f)
 
-        $([:(oe[$i] < of[$i] && return true ; oe[$i] > of[$i] && return false) for i in 1:N]...)
+#         $([:(oe[$i] < of[$i] && return true ; oe[$i] > of[$i] && return false) for i in 1:N]...)
 
-        return false
-    end
-end
+#         return false
+#     end
+# end
 
-function lt(t::AbsMonomialOrder, m1 :: OreMonVE, m2 :: OreMonVE)
-    return lt(t,m1.exp,m2.exp)
-end
+# function lt(t::AbsMonomialOrder, m1 :: OreMonVE, m2 :: OreMonVE)
+#     return lt(t,m1.exp,m2.exp)
+# end
 
 
 function Base.Order.lt(ord :: AbsMonomialOrder, a :: AbsOrePolynomial, b :: AbsOrePolynomial)

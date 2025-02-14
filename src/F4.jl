@@ -263,6 +263,18 @@ function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param(
     return basis
 end
 
+function f4_mri(A :: OreAlg,gen :: Vector{OrePoly{K,M}}, param :: F4Param) where {K,M}
+    # flatten the result to allow rational reconstruction with mri 
+    tmp =  f4(gen,A,param = param)
+    res = tmp[1]
+    for i in 2:length(tmp)
+        append!(res,tmp[i])
+    end
+    return res 
+end
+
+
+
 
 function Buchberger2(gens_ :: Vector{OrePoly{K,M}}, A :: Alg;param ::F4Param = f4_param()) where {K,M,Alg <: OreAlg}
     gens = deepcopy(gens_)
@@ -307,6 +319,17 @@ function Buchberger2(gens_ :: Vector{OrePoly{K,M}}, A :: Alg;param ::F4Param = f
     return basis
 end
 
+function Buchberger2_mri(A :: OreAlg,gen :: Vector{OrePoly{K,M}}, param :: F4Param) where {K,M}
+    # flatten the result to allow rational reconstruction with mri 
+    tmp =  Buchberger2(gen,A,param = param)
+    res = tmp[1]
+    for i in 2:length(tmp)
+        append!(res,tmp[i])
+    end
+    return res 
+end
+
+
 
 function delete_spairs_with_T!(pgb :: PartialGB, A :: OreAlg)
     N = nvars(A)
@@ -342,3 +365,5 @@ function delete_op_with_T!(v :: Vector{OrePoly{C, M}},A:: OreAlg) where {C,M}
         deleteat!(v,s)
     end
 end
+
+
