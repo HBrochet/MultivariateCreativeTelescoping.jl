@@ -238,7 +238,6 @@ function symbolicpp(A::alg,
     todo = Set{M}()
     done = Set{M}()
     inputrows = BitSet()
-
     for (i, p) in enumerate(pols)
         if spairrecution
             if stat(param)

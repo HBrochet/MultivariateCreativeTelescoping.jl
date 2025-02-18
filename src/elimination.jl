@@ -197,10 +197,13 @@ function reducenewpivots!(mx :: NmodF4Matrix{I, T, Tbuf},param :: F4Param) where
 
     piv = [mon(mx.rows[p],1) for p in mx.newpivots]
     sort!(piv,rev=true)
+
     @inbounds for p in piv
         row = mx.rows[mx.pivots[p]]
+        if length(row) < 2 
+            continue 
+        end
         fillbuffer!(buffer, row, ctx(mx.A))
-
         for j in mon(row,2):mx.nbcolumns
             elementary_reduction_in_buffer(mx, buffer, j,param)
         end

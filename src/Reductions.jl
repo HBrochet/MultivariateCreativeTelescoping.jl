@@ -89,14 +89,15 @@ function GD_prereduction_init(G2 :: Vector{OrePoly{T,M}}, G1 :: Vector{OrePoly{T
     for g in G2 
         tmpG = OrePoly{T,M}[]
         push!(tmpG,g)
-        push!(donotadd,mon(g,1))
+        m = mon(g,1)
+
+        push!(donotadd,m)
         newrel = GD_reduction1!(g,G1,A,geob,tmp_poly)
         newrel = reduce_with_echelon!(echelon,newrel,A,geob,tmp_poly)
         if B && length(newrel) == 0 
-            push!(set_trace,mon(g,1))
+            push!(set_trace,m)
         end
         add_echelon!(echelon,newrel,A)
-        m = mon(g,1)
         k = sum(m[i] for i in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv)
         for i in k+1:sigma
             if B
@@ -120,6 +121,7 @@ function GD_prereduction_init_apply(G2 :: Vector{OrePoly{T,M}}, G1 :: Vector{Ore
         return OrePoly{T,M}[], OrePoly{T,M}[]
     end 
     donotadd = deepcopy(_donotadd)
+    donotadd = SortedSet{M}(order(A))
 
     echelon = OrePoly{T,M}[] 
     G = OrePoly{T,M}[]
@@ -174,7 +176,7 @@ function GD_prereduction_increment!(echelon :: Vector{OrePoly{T,M}}, G :: Vector
             red = GD_reduction1!(newrel,G1,A,geob,tmp_poly)
             red = reduce_with_echelon!(echelon,red,A,geob,tmp_poly)
             if !isnothing(set_trace) && length(red) == 0 
-                push!(set_trace,mon(newrel,1))
+                push!(set_trace,new_lmon)
             end
             add_echelon!(echelon,red,A)
         end 

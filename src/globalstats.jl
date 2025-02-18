@@ -17,7 +17,8 @@ function initglobalstats!()
               :f5_eliminated_signatures, :f5_candidate_signatures, :f5_size_reducer,:f5_deg_reducer,:f5_number_divisions,
               :f5_eliminated_signatures_stophol,:f5_size_m,
               :number_primes,:number_evaluation,:number_pol_evaluation,
-              :mct_red_zero]
+              :mct_red_zero,
+              :mri_nb_points]
         push!(globalstats.counters, p => 0)
     end
 

@@ -115,7 +115,7 @@ function normal(a::UInt64, ctx::Nmod32Γ)
 end
 
 function convertn(x :: Integer,ctx :: Nmod32Γ)
-    return convert(mod(x,ctx.char),ctx)
+    return convert(mod(x,Int(ctx.char)),ctx)
 end
 
 
@@ -209,7 +209,6 @@ Base.iszero(x :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = x == ctx.F(0)
 Base.isone(x :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = x == ctx.F(1)
 
 function evaluate(a :: UnivRatFunModp, p :: T) where T 
-    println(T)
     return Nemo.evaluate(Nemo.numerator(a,false),p)//Nemo.evaluate(Nemo.denominator(a,false),p)
 end
 

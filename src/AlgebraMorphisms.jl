@@ -525,7 +525,6 @@ function evaluate_parameter_many(d :: Dict{M,OrePoly{TT,M}}, v :: Vector{UInt}, 
     return res
 end
 
-#rendu ici 
 function evaluate_parameter_many(mat :: Generic.MatSpaceElem{Generic.FracFieldElem{Nemo.fpPolyRingElem}}, v :: Vector{UInt}, nA :: OreAlg;denisone ::Val{T}= Val(false)) where T
     nc = number_of_columns(mat)
     nr = number_of_rows(mat)

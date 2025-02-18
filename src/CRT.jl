@@ -38,16 +38,16 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...)
                 bound += 1 
             end
         end
-        if nprime == 10
-            # for i in 1:5 
-            #     prettyprint(res_modp[i],A)
-            # end
-            prev_res = crt(res_modp, primes_, A)
-            clear_denominators!(prev_res,A)
-            succeeded = true 
-            @debug "success, trying one more prime"
-            error("fin")
-        end
+        # if nprime == 100
+        #     # for i in 1:5 
+        #     #     prettyprint(res_modp[i],A)
+        #     # end
+        #     prev_res = crt(res_modp, primes_, A)
+        #     clear_denominators!(prev_res,A)
+        #     succeeded = true 
+        #     @debug "success, trying one more prime"
+        #     error("fin")
+        # end
 
         nprime += 1 
         globalstats.counters[:number_primes] += 1

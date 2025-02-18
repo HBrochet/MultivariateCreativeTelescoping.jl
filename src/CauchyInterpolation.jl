@@ -92,7 +92,7 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;p
             end 
             bound += 1
         end
-        # if npoints ==100
+        # if npoints ==2
         #     # println("randpoints")
         #     # println(randpoints)
         #     # print("evres")
@@ -117,7 +117,6 @@ function cauchy_interpolation(v :: Vector{UInt32}, points :: Vector{Int}, A :: O
     ev = [R(Int(c)) for c in v]
     evp = [R(p) for p in points]
     num, den = cauchy_interpolation(ctx(A).R, ctx(A).vars[1], evp, ev, div(length(points), 2),prd = prd)
-    # println("degree num $(Nemo.degree(num)) and den $(Nemo.degree(den))")
     return ctx(A).F(num) / ctx(A).F(den)
 end
 

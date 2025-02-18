@@ -90,7 +90,6 @@ function der_red_map_precomp(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: Or
         understair, irred = next_slice(understair, lm_g1, lm_ech, A)
         push!(stairs,SortedSet{M}(order(A),irred))
         update_stairs!(stairs,newlm,nd,A)
-
     end
 
     spol = reduce_with_echelon!(echelon,spol,A)
@@ -111,7 +110,11 @@ function der_red_map_precomp2(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: O
     red_dt_degx = maximum(sum(mon(red_dt,j)[i] for i in 2+A.npdv:1+2*A.npdv) - sum(mon(red_dt,j)[i] for i in 2:1+A.npdv) for j in 2:length(red_dt))
     g1,g2 = separate(gb,A)
     if length(g2) == 0
-        return spol, g1, red_dt, OrePoly{T,M}[]
+        if B 
+            return spol, g1, red_dt, OrePoly{T,M}[], TracerDerRedMap{M}(SortedSet{M}(order(A)),0)
+        else
+            return spol, g1, red_dt, OrePoly{T,M}[]
+        end
     end
 
     spol_degx = sum(mon(red_dt,1)[i] for i in 2+A.npdv:1+2*A.npdv)
@@ -299,10 +302,10 @@ function der_red_map(A :: OreAlg, spol :: OrePoly, gb :: Vector{OrePoly{T,M}},pa
         tmp_poly = ReuseOrePoly(1,A)
         if B 
             spol, g1, red_dt, echelon, trace = der_red_map_precomp2(spol,gb,A,geob,tmp_poly,tracer = Val(B))
-            return (find_der_red_map(spol,g1,red_dt,echelon,A,geob,tmp_poly), spol), trace
+            tmp = find_der_red_map(spol,g1,red_dt,echelon,A,geob,tmp_poly)
+            return (tmp, spol), trace
         else 
-            spol, g1, red_dt, echelon = der_re
-            d_map_precomp2(spol,gb,A,geob,tmp_poly)
+            spol, g1, red_dt, echelon = der_red_map_precomp2(spol,gb,A,geob,tmp_poly)
             return find_der_red_map(spol,g1,red_dt,echelon,A,geob,tmp_poly), spol
         end 
     else
@@ -316,12 +319,17 @@ end
 function der_red_map(A :: OreAlg, trace :: TracerDerRedMap, spol :: OrePoly, gb :: Vector{OrePoly{T,M}},param :: MCTParam) where {T,M}
     geob = GeoBucket(zero(A))
     tmp_poly = ReuseOrePoly(1,A)
-
     red_dt = find_red_dt(gb,A)
     g1,g2 = separate(gb,A)
     echelon, _ = GD_prereduction_init_apply(g2, g1, trace.i,trace.s, A,geob,tmp_poly)
 
     spol = GD_reduction1!(spol,g1,A,geob,tmp_poly)
-    spol = reduce_with_echelon!(echelon,spol,A,geob,tmp_poly)   
-    return find_der_red_map(spol,g1,red_dt,echelon,A,geob,tmp_poly), spol
+    spol = reduce_with_echelon!(echelon,spol,A,geob,tmp_poly) 
+
+    debug(param) && @debug "starting find_der_red_map at time $(time()). "
+
+    tmp = find_der_red_map(spol,g1,red_dt,echelon,A,geob,tmp_poly)  
+    debug(param) && @debug "der_red_map computed at time $(time()). "
+    debug(param) && @debug "the echelon form has length $(length(echelon))."
+    return tmp, spol
 end

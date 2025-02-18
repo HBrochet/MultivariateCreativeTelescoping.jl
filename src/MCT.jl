@@ -1,9 +1,9 @@
 
 function MCT_internal(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg,param :: MCTParam) where {T,M}
     push!(A.nomul,1)
-    par = CIParam{false,true}()
+    par = CIParam{false,false}()
     der_map, spol = compute_with_cauchy_interpolation(der_red_map, A, spol, gb,param,param=par)
-
+    debug(param) && @debug "der_red_map successfully reconstructed, starting to compute the LDE"
     deleteat!(A.nomul, length(A.nomul))
     return find_LDE_by_interpolation(der_map, spol, A)
 
@@ -103,7 +103,7 @@ function compute_next_rel(map_ :: Dict{M,OrePoly{T,M}}, pol :: OrePoly{T,M},den 
     normalize!(res,A)
     if den != one(ctx(A))
         cpol = deepcopy(pol)
-        mul!(ctx(A).F(ord+1),cpol,A)
+        mul!(ctx(A).F(ord+1)*derivative(den),cpol,A)
         res = sub!(res,cpol,A)
     end
     for (c,m) in pol 

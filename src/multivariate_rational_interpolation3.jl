@@ -43,7 +43,6 @@ function multivariate_rational_interpolation(F :: Function, A :: OreAlg, args...
             add_ev_point!(i,d,pts,evsn,evsd,nb_points,bounds,a,shift,R0,F,A,args...)
         end
     end
-
 end
 
 function mri_first_reconstruction(F :: Function, A :: OreAlg, point :: T, a :: Vector{T}, shift :: Vector{T},R0 :: Ring, args...) where T 
@@ -64,8 +63,9 @@ function mri_first_reconstruction(F :: Function, A :: OreAlg, point :: T, a :: V
     while true
         push!(rps,C(rand(Int)))
         ctr +=1
-
+        let ctr = ctr
         po = [rps[ctr]*point + shift[1],Tuple(a[i]*rps[ctr] + shift[i] for i in 2:n)...]
+        end
         nA = evaluate_coeff_algebra(po,A)
         ev_args = evaluate_coeff(po,nA,args...)
         push!(ev_res, F(nA,ev_args...))
@@ -74,6 +74,7 @@ function mri_first_reconstruction(F :: Function, A :: OreAlg, point :: T, a :: V
             if nres == res 
                 nb_points = maximum(Nemo.degree(Nemo.numerator(c,false)) + Nemo.degree(Nemo.denominator(c,false)) + 1 for c in coeffs(res))
                 bounds = [Nemo.degree(Nemo.numerator(c,false))+1 for c in coeffs(res)]
+                globalstats.counters[:mri_nb_points] += ctr
                 return res, nb_points, bounds 
             end 
             res = nres
@@ -112,8 +113,12 @@ function init_evs(ev1 :: OrePoly, point ::T,R0 :: Ring, A :: OreAlg) where T
     end
 
     for i in 1:length(ev1)
-        evsn[i] = [Vector{Vector{R0_elem}}[] for j in 1:n]
-        evsd[i] = [Vector{Vector{R0_elem}}[] for j in 1:n]
+        evsn[i] = Vector{Vector{Vector{R0_elem}}}(undef,n) 
+        evsd[i] = Vector{Vector{Vector{R0_elem}}}(undef,n) 
+        for j in 1:n 
+            evsn[i][j] = Vector{Vector{R0_elem}}[]
+            evsd[i][j] = Vector{Vector{R0_elem}}[]
+        end
     end
 
     # add ev1 to evsn and evsd
@@ -155,7 +160,7 @@ function try_mpi(pts :: Vector{Vector{Vector{Vector{T}}}},evsn :: Vector{Vector{
             end
             b, j, d, tmp = try_mpi_reconstruction(pts,evsn,i,l-1,a,shift,U,R,nskeleton, ivar_nskel)
             if !b 
-                return false, j,d , [[R(0)]]
+                return false, j,d , [ctx(A).F(0)]
             end
             nskeleton[i][l] = tmp 
             tmp2 = Rz(Nemo.evaluate(tmp, po))
@@ -175,7 +180,7 @@ function try_mpi(pts :: Vector{Vector{Vector{Vector{T}}}},evsn :: Vector{Vector{
             end
             b, j, d, tmp = try_mpi_reconstruction(pts,evsd,i,l-1,a,shift,V,R,dskeleton,ivar_dskel)
             if !b 
-                return false, j,d, [[R(0)]]
+                return false, j,d, [ctx(A).F(0)]
             end
             dskeleton[i][l] = tmp 
             tmp2 = Rz(Nemo.evaluate(tmp, po))
@@ -213,8 +218,17 @@ function try_mpi_reconstruction(pts :: Vector{Vector{Vector{Vector{T}}}},evs0 ::
 
 
         if i == 1 
-            rs =  [pts[i][j][1][1] for j in 1:len-1] # evaluation points of the first variable 
-            evs = [Nemo.coeff(evs0[h][i][j][1],d) - Nemo.evaluate(U[d+1], [rs[j], (a[k] for k in 2:n)...]) for j in 1:len-1] 
+            rs = Vector{C_elem}(undef,len-1)  # evaluation points of the first variable 
+            evs = Vector{C_elem}(undef,len-1)
+            evp = Vector{C_elem}(undef,n)
+            for j in 2:n 
+                evp[j] = a[j]
+            end
+            for j in 1:len-1 
+                rs[j] = pts[i][j][1][1]
+                evp[1] = rs[j]
+                evs[j] = Nemo.coeff(evs0[h][i][j][1],d) - Nemo.evaluate(U[d+1], evp) 
+            end
             tmp = interpolate(R0,rs,evs) 
 
             push!(rs, pts[i][len][1][1])
@@ -242,12 +256,18 @@ function try_mpi_reconstruction(pts :: Vector{Vector{Vector{Vector{T}}}},evs0 ::
             S = matrix_space(C, t, t)
             mat = S() 
             b = Vector{C_elem}(undef,t)
+            
+            pt = Vector{C_elem}(undef,n)
+
             for j in 1:npts
                 for (k,mon) in enumerate(monomials(skeleton)) 
                     point = [pts[i][j][k][l] for l in 1:i]
-
-                    pt = [point..., Tuple(a[l] for l in i+1:n)... ]
-
+                    for l in 1:i 
+                        pt[l] = pts[i][j][k][l]
+                    end
+                    for l in i+1:n 
+                        pt[l] = a[l]
+                    end
                     # fill mat and b 
                     b[k] = Nemo.coeff(evs0[h][i][j][k],d) - Nemo.evaluate(U[d+1], pt)
                     for (l,m) in enumerate(monomials(skeleton))
@@ -330,20 +350,44 @@ function add_ev_point!(j :: Int,d :: Int ,pts, evsn ,evsd, nb_points :: Int,boun
     R0_elem = elem_type(R0)
     
     if length(evsn[1][j]) > 0 
-        d = max(d, length(evsn[1][j][1]))
+        tmp = length(evsn[1][j][1])
+        d = max(d, tmp)
     end
-    if length(evsn[1][j]) > 0 && any(length(evsn[1][j][k]) < d for k in length(evsn[1][j])) 
+    let boo
+    let d=d
+        if length(evsn[1][j]) > 0 
+            boo = any(length(evsn[1][j][k]) < d for k in length(evsn[1][j]))
+        else
+            boo = false 
+        end
+    end
+    if length(evsn[1][j]) > 0 && boo
         # then add evaluations to the vectors of evs[_][j][k]  until they all have size d
+
+        rps = Vector{C_elem}(undef,nb_points)
+        ev_res = Vector{OrePoly{UInt32,M}}(undef,nb_points)
+        po = Vector{C_elem}(undef,n)
+        [C(rand(Int)) for i in 1:nb_points]
+
         for k in 1:length(evsn[1][j])
             for l in length(evsn[1][j][k])+1:d 
-                point = [(C(rand(Int)) for i in 1:j-1)...,pts[j][k][1][j]]
-                rps = [C(rand(Int)) for i in 1:nb_points]
-                ev_res = Vector{OrePoly{UInt32,M}}(undef,nb_points)
+                point = Vector{C_elem}(undef,j)
+                for i in 1:j-1 
+                    point[i] = C(rand(Int))
+                end
+                point[j] = pts[j][k][1][j]
                 for m in 1:nb_points 
-                    po = [(point[i]*rps[m] + shift[i] for i in 1:j)...,(a[i]*rps[m] + shift[i] for i in j+1:n)...]
+                    rps[m] = C(rand(Int))
+                    for i in 1:j 
+                        po[i] = point[i]*rps[m] + shift[i]
+                    end
+                    for i in j+1:n 
+                        po[i] = a[i]*rps[m] + shift[i]
+                    end
                     nA = evaluate_coeff_algebra(po,A)
                     ev_args = evaluate_coeff(po,nA,args...)
-                    ev_res[m] = F(nA,ev_args...)                    
+                    ev_res[m] = F(nA,ev_args...)    
+                    globalstats.counters[:mri_nb_points] += 1
                 end
                 ev = cauchy_interpolation_mri(ev_res,rps,R0, A,bounds=bounds)
                 push!(pts[j][k],point)
@@ -370,16 +414,27 @@ function add_ev_point!(j :: Int,d :: Int ,pts, evsn ,evsd, nb_points :: Int,boun
             push!(evsd[i][j], Vector{R0_elem}[])
         end
 
-
+        rps = Vector{C_elem}(undef,nb_points)
+        ev_res = Vector{OrePoly{UInt32,M}}(undef,nb_points)
+        po = Vector{C_elem}(undef,n)
         for l in 1:d 
-            point = [(C(rand(Int)) for i in 1:j-1)...,p]
-            rps = [C(rand(Int)) for i in 1:nb_points]
-            ev_res = Vector{OrePoly{UInt32,M}}(undef,nb_points)
+            point = Vector{C_elem}(undef,j) 
+            for i in 1:j-1 
+                point[i] = C(rand(Int))
+            end
+            point[j] = p
             for m in 1:nb_points 
-                po = [(point[i]*rps[m] + shift[i] for i in 1:j)...,(a[i]*rps[m] + shift[i] for i in j+1:n)...]
+                rps[m] = C(rand(Int))
+                for i in 1:j 
+                    po[i] = point[i]*rps[m] + shift[i]
+                end
+                for i in j+1:n 
+                    po[i] = a[i]*rps[m] + shift[i]
+                end
                 nA = evaluate_coeff_algebra(po,A)
                 ev_args = evaluate_coeff(po,nA,args...)
                 ev_res[m] = F(nA,ev_args...)
+                globalstats.counters[:mri_nb_points] += 1
             end
             ev = cauchy_interpolation_mri(ev_res,rps,R0, A,bounds = bounds)
 
@@ -397,6 +452,8 @@ function add_ev_point!(j :: Int,d :: Int ,pts, evsn ,evsd, nb_points :: Int,boun
             end 
         end
     end
+    end
+    return nothing
 end
 
 function univ_pol_to_multiv_pol(R1 :: PolyRing, R2 :: MPolyRing, p ::RingElement,i ::Int) 
