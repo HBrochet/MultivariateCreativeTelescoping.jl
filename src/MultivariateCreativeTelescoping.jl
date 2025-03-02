@@ -56,6 +56,7 @@ include("testfunctions.jl")
 # include("multivariate_rational_interpolation.jl")
 # include("multivariate_rational_interpolation2.jl")
 include("multivariate_rational_interpolation3.jl")
+include("multivariate_rational_interpolation_known_support.jl")
 
 @exportAll()
 

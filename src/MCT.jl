@@ -20,6 +20,10 @@ function MCT(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg;param :: MCT
     end
 end
 
+function MCT(A::OreAlg, spol :: OrePoly, gb :: Vector{OrePoly{T,M}}; param :: MCTParam = mct_param()) where {T,M}
+    return MCT(spol,gb,A;param = param)
+end
+
 
 
 
@@ -81,7 +85,7 @@ function find_first_lin_dep_derivatives(map_ :: Dict{M,OrePoly{T,M}}, spol :: Or
     rels = OrePoly{T,M}[]
     while true  
         push!(rels,nrel)
-        nrel_red = evaluate_parameter(nrel,point,nA)
+        nrel_red = evaluate_parameter(nrel,point,1,nA)
         nrel_red, v = reduce_with_echelon_augmented!(echelon_derivatives,nrel_red,nA,echelonvect)
         if length(nrel_red) == 0 
             return rels, Fden

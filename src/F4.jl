@@ -25,15 +25,16 @@ mutable struct PartialGB{T,M, Alg,B,C,D}
     candidates :: Vector{OrePoly{T,M}}     # halfpairs to be reduced
     spairs :: Vector{Spair{M}} # spairs
     param :: F4Param{B,C,D}
-
+    geob :: GeoBucket{T, M}
     function PartialGB{T, M, Alg,B,C,D}(
         A :: Alg, generators :: Vector{OrePoly{T,M}},param :: F4Param{B,C,D}
     ) where {T, M, Alg <: OreAlg,B,C,D}
         gens = copy(generators)
         #reducebasis!(gens,A)
-        gens2 = interreduce(A,gens,param)
+        geob = GeoBucket(zero(A))
+        gens2 = interreduce(A,gens,param,geob)
         new(A, OrePoly{T,M}[],
-            BitSet(), gens2, OrePoly{T,M}[], Vector{Spair{M}}(),param)
+            BitSet(), gens2, OrePoly{T,M}[], Vector{Spair{M}}(),param,geob)
     end
 end
 
@@ -185,8 +186,8 @@ function selectspairs!(pgb :: PartialGB)
         if max_deg_block(sp.lcm,pgb.alg) > deg 
             break 
         end
-        push!(pgb.candidates, shift(pgb.basis[sp.left ], sp.lcm,pgb.alg))
-        push!(pgb.candidates, shift(pgb.basis[sp.right], sp.lcm,pgb.alg))
+        push!(pgb.candidates, shift(pgb.basis[sp.left ], sp.lcm,pgb.alg,pgb.geob))
+        push!(pgb.candidates, shift(pgb.basis[sp.right], sp.lcm,pgb.alg,pgb.geob))
         pop!(pgb.spairs)
         ctr += 1 
     end
@@ -221,7 +222,7 @@ function findnewrels!(pgb :: PartialGB)
     rows = pgb.candidates
 
     debug(pgb.param) && @debug "symbolic preprocessing"
-    mx = symbolicpp(pgb.alg, rows, activebasis, pgb.param,true, true)
+    mx = symbolicpp(pgb.alg, rows, activebasis, pgb.param,pgb.geob,true, true)
 
     debug(pgb.param) && @debug "reducing a sparse $(length(mx.rows))×$(mx.nbcolumns) matrix"
     reduce!(mx,pgb.param)
@@ -258,7 +259,7 @@ function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param(
 
     basis = [pgb.basis[i] for i in pgb.active]
     stophol(param) && isholonomic(basis,A) && delete_op_with_T!(basis,A)
-    basis = interreduce(A, basis,param)
+    basis = interreduce(A, basis,param,pgb.geob)
     # reducebasis!(basis,A)
     sort!(basis, lt = (x,y) -> lt(order(A),x[1][2], y[1][2]), rev = true)
     return basis

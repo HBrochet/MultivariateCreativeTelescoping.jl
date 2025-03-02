@@ -378,7 +378,9 @@ Base.zero(ctx :: RatFunQQCtx) = ctx.F(0)
 Base.iszero(x :: RatFunQQ, ctx :: RatFunQQCtx) = x == ctx.F(0)
 Base.isone(x :: RatFunQQ, ctx :: RatFunQQCtx) = x == ctx.F(1)
 
-
+function evaluate(a :: RatFunQQ, p :: Vector{T}) where T
+    return Nemo.evaluate(Nemo.numerator(a,false),p)//Nemo.evaluate(Nemo.denominator(a,false),p)
+end
 
 ## defining rational coefficient 
 struct QQCtx <: NmodLikeΓ{QQFieldElem,QQFieldElem} 

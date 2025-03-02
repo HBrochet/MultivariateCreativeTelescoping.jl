@@ -217,6 +217,7 @@ end
 function interreduce(alg :: OreAlg,
                       pols :: Vector{OrePoly{I, T}},
                       param :: F4Param,
+                      geob :: GeoBucket,
                       fullreduction :: Bool = true
                       ) where {I, T}
 
@@ -227,7 +228,7 @@ function interreduce(alg :: OreAlg,
         end
     end
 
-    mx = interreductionmx(alg, pols,param)
+    mx = interreductionmx(alg, pols,param,geob)
     if fullreduction
         reducepivots!(mx,param)
         reduce_full_known_pivots!(mx,param)

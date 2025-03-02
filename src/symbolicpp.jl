@@ -30,9 +30,12 @@ end
 
 
 
-function monomialsubs(P :: OrePoly, dic :: Dict{M,IdxMon}) where {M <: AbsOreMonomial}
+Base.@propagate_inbounds function monomialsubs(P :: OrePoly, dic :: Dict{M,IdxMon}) where {M <: AbsOreMonomial}
     co = copy(coeffs(P))
-    mo = [dic[mon(P,i)] for i in 1:length(P)]
+    mo = Vector{IdxMon}(undef,length(P))
+     for i in 1:length(P)
+        mo[i] = dic[mon(P,i)]
+    end
     return OrePoly(co,mo)
 end
 
@@ -117,8 +120,8 @@ function saturate!(A::alg,
                    rows::Vector{OrePoly{K,M}},
                    basis::Vector{OrePoly{K,M}},
                    todo::Set{M}, done::Set{M},
-                   param ::F4Param
-                   ) where {K,M, alg <: OreAlg}
+                   param ::F4Param,
+                   geob :: GeoBucket) where {K,M, alg <: OreAlg}
 
     # recursively find all possible reducers
 
@@ -135,7 +138,7 @@ function saturate!(A::alg,
             red = basis[i]
             lmred = mon(red,1)
             if divide(lmred, m,A)
-                sred = shift(red, m,A)
+                sred = shift(red, m,A,geob)
                 if stat(param) 
                     globalstats.counters[:f4_nb_reducer_computed] += 1
                     globalstats.counters[:f4_size_reducer] += length(sred)
@@ -163,7 +166,7 @@ end
 #the pivots and normalize them if required.
 
 function f4matrix(A::alg,
-                  rows::Vector{OrePoly{K,M}},
+                  rows_::Vector{OrePoly{K,M}},
                   monomialset::Set{M}, donotpivot::BitSet,
                   inputrows::BitSet
                   ) where {K,M, alg <: OreAlg}
@@ -177,8 +180,11 @@ function f4matrix(A::alg,
     end
 
     # Better to do it in place?
-    rows = [monomialsubs(r, monomialtoidx) for r in rows]
-    # Among all possible pivots for a column, we choose the last
+    rows = Vector{OrePoly{K,IdxMon}}(undef,length(rows_))
+    for i in 1:length(rows_)
+        rows[i] = monomialsubs(rows_[i], monomialtoidx)
+    end 
+        # Among all possible pivots for a column, we choose the last
     pivots = zeros(Int, length(monomials))
     for (i, row) in enumerate(rows)
         IdxMon(i) ∈ donotpivot && continue
@@ -227,6 +233,7 @@ function symbolicpp(A::alg,
     pols::Vector{OrePoly{K,M}},
     basis::Vector{OrePoly{K,M}},
     param ::F4Param,
+    geob :: GeoBucket,
     interreduction::Bool=true,
     spairrecution::Bool=false
    ) where {alg <: OreAlg, K, M}
@@ -252,14 +259,15 @@ function symbolicpp(A::alg,
         push!(inputrows, length(rows))
     end
 
-    saturate!(A, rows, basis, todo, done,param)
+    saturate!(A, rows, basis, todo, done,param,geob)
 
     return f4matrix(A, rows, done, interreduction ? BitSet() : inputrows, inputrows)
 end
 
 function interreductionmx(A :: OreAlg,
                           basis::Vector{OrePoly{I, T}},
-                          param :: F4Param
+                          param :: F4Param,
+                          geob :: GeoBucket
                           ) where {I, T}
 
 
@@ -281,9 +289,15 @@ function interreductionmx(A :: OreAlg,
     for (i, p) in enumerate(basis)
         pushrow!(A, rows, p, todo, done)
         push!(inputrows, length(rows))
-        saturate!(A, rows, currentbasis, todo, done,param)
+        saturate!(A, rows, currentbasis, todo, done,param,geob)
         push!(currentbasis, p)
     end
 
     return f4matrix(A, rows, done, BitSet(), inputrows)
+end
+
+
+function shift(P :: OrePoly{K,M}, m :: M, A :: alg,geob :: GeoBucket) where {K,M,alg <: OreAlg}
+    addmul_geobucket!(geob,one(ctx(A)),m/mon(P,1),P,A)
+    return normalform(geob,A)
 end
