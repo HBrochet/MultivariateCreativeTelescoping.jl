@@ -73,7 +73,7 @@ end
 
 
 
-function make_order(s ::String,strvar_to_indexp :: Dict{String,E}, ::Val{M}) where {E, M<:AbsOreMonomial}
+function make_order2(s ::String,strvar_to_indexp :: Dict{String,E}, ::Val{M}) where {E, M<:AbsOreMonomial}
     blocs = split(s, ">")
     filter!(b -> length(split(b)) > 1, blocs)
     ord, _ = make_order_rec(blocs,strvar_to_indexp,Val(M))

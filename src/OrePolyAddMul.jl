@@ -91,6 +91,80 @@ function add!(P :: OrePoly, Q :: OrePoly, A :: OreAlg; normal :: Bool = true)
     return res
 end
 
+
+# function add_in_place!(P ::OrePoly, Q :: OrePoly, A::OreAlg)
+#     ctx = ctx(A)
+#     lenp = length(P)
+#     lenq = length(Q)
+
+#     ipr = 1 # reading index in P
+#     ipw = 1 # writting index in P
+#     iq = 1 # reading index in Q 
+#     # R is a temporary polynomial that we store at the beginning of Q 
+#     irr = 1 # reading index of R in Q
+#     irw = 1 # writing index of R in Q
+
+    # while ipr <= lenp && iqr <= lenq 
+    #     if lt(order(A), mon(Q,iq),mon(P,ip))
+    #         P[ipw] = P[ipr]
+    #         ipw += 1
+    #         ipr += 1
+    #     elseif mon(P,ip) == mon(Q,iq) 
+    #         c = add(P.coeffs[ipr],Q.coeffs[iq],ctx)
+    #         if !iszero(c)
+    #             P[ipw] = (c,mp) 
+    #             ipw += 1
+    #         end
+    #         ipr += 1
+    #         iq += 1
+    #     elseif ipw < ipr  # we know that mq > mp
+    #         P[ipw]= Q[iq]
+    #         iq += 1
+    #         ipw += 1 
+    #     else
+    #         tmp = Q[iq]
+    #         Q[irw] = P[ipr]
+    #         P[ipw] = tmp
+
+    #         irw += 1
+    #         iq += 1
+    #         ipw += 1
+    #         ipr += 1
+
+    #         # by construction we allways have mr > mp
+    #         while irw - irr > 0 && ipr <= lenp && iqr <= lenq
+    #             mr = mon(Q,irr)
+    #             mq = mon(Q,iq)
+    #             if lt(order(A), mr, mq)
+    #                 tmp = (coeff(Q,iq), mq)
+    #                 Q[irw] = P[ipr]
+    #                 P[ipw] = tmp
+        
+    #                 iq += 1
+    #                 ipw += 1
+    #                 ipr += 1
+    #                 irw += 1
+
+    #             elseif mr == mq 
+    #                 c = coeff(Q,iq) + coeff(Q,irr)
+    #                 if !iszero(c)
+    #                     tmp = P[ipr]
+    #                     P[ipw] = (c,mr) 
+    #                     Q[ipw] = tmp
+    #                     ipw += 1
+    #                     ipr += 1
+    #                     irw +=1
+    #                 end
+    #                 iq += 1 
+    #                 irr += 1
+    #             else # mq < mr 
+    #                 c = coeff(Q,irr)
+                    
+
+    #     end
+    # end
+
+
 """
     add(p :: OrePoly, q :: OrePoly, A :: OreAlg)
 
@@ -261,28 +335,53 @@ function mul( T1 ::Tuple{K,M}, T2 :: Tuple{K2,M}, A :: OreAlg; normal=true) wher
 end
 
 function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K2,M}, A :: OreAlg) where {M,K,K2}
-    #noncomm = Int[]
     s = 1 # size of the product before the call to normalize!
-
+    N = nvars(A)
     for l in 1:A.nlv # for each loc vars
         if T1[2][l + A.nrdv+2*A.npdv] > 0
             for k in 1:A.nrdv + A.npdv
                 if T2[2][k] > 0
-                    indT = l + A.nrdv+2*A.npdv+A.npv
-                    T = makemon(indT,A)
-                    dt = makemon(k, A)
+                    if A.varord == "dleft"
+                        indT = l + A.nrdv+2*A.npdv+A.npv
+                        T = makemon(indT,A)
+                        dt = makemon(k, A)
 
-                    Tpower = T^T1[2][indT]
-                    fact1 = (T1[1], T1[2]/ Tpower)
-                    fact2 = makepoly(T2[1],dt*Tpower)
+                        Tpower = T^T1[2][indT]
+                        fact1 = (T1[1], T1[2]/ Tpower)
+                        fact2 = makepoly(T2[1],dt*Tpower)
 
-                    tmp = mul(A.diff_pols_loc[l][k], makepoly(T2[1]*convertn(Int(T1[2][indT]),ctx(A)),T^(T1[2][indT]+1)),A,normal=true)
-                    fact2 = add!(fact2, tmp, A,normal=true)
+                        tmp = mul(A.diff_pols_loc[l][k], makepoly(T2[1]*convertn(Int(T1[2][indT]),ctx(A)),T^(T1[2][indT]+1)),A,normal=true)
+                        fact2 = add!(fact2, tmp, A,normal=true)
 
 
-                    fact3 = (one(ctx(A)), T2[2]/dt)
-                    tmp = mul(fact1,mul(fact2,fact3,A,normal=true),A,normal=true)
-                    return tmp
+                        fact3 = (one(ctx(A)), T2[2]/dt)
+                        tmp = mul(fact1,mul(fact2,fact3,A,normal=true),A,normal=true)
+                        return tmp
+                    else 
+                        indT = l + A.nrdv+2*A.npdv+A.npv
+                        T = makemon(indT,A)
+                        dt = makemon(k, A)
+
+                        Tpower = T^T1[2][indT]
+                        m = OreMonVE(SVector{N,Int16}((i <= A.npdv + A.nrdv) || (i > A.nrdv + 2*A.npdv) ? Int16(0) : T2[2][i] for i in 1:N))
+                        fact1 = (T1[1], T1[2]/ Tpower)
+                        fact1b = (one(ctx(A)),m)
+                        fact2 = makepoly(T2[1],dt*Tpower)
+
+                        tmp = mul(A.diff_pols_loc[l][k], makepoly(T2[1]*convertn(Int(T1[2][indT]),ctx(A)),T^(T1[2][indT]+1)),A,normal=true)
+                        # println("tmp")
+                        # prettyprint(tmp,A)
+                        fact2 = add!(fact2, tmp, A,normal=true)
+
+
+                        fact3 = (one(ctx(A)), T2[2]/dt/m)
+                        tmp = mul(fact1,mul(fact1b,mul(fact2,fact3,A,normal=true),A,normal=true),A,normal=true)
+                        # prettyprint(OrePoly([fact1[1]],[fact1[2]]),A)
+                        # prettyprint(OrePoly([fact1b[1]],[fact1b[2]]),A)
+                        # prettyprint(fact2,A)
+                        # prettyprint(OrePoly([fact3[1]],[fact3[2]]),A)
+                        return tmp
+                    end
                 end
             end
         end
@@ -319,7 +418,7 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K2,M}, A :: OreAlg) where {M,K,K2}
             tmp = min(T1[2][l],T2[2][l-A.npdv])
             s = s * (tmp + 1)
             if s < 0
-                println(T1[2][l], " ", T2[2][l-A.npdv])
+                # println(T1[2][l], " ", T2[2][l-A.npdv])
             end
         end
 
@@ -356,9 +455,6 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K2,M}, A :: OreAlg) where {M,K,K2}
         for l in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv
             tmp = min(T1[2][l-A.npdv],T2[2][l])
             s = s * (tmp + 1)
-            if s < 0
-                println(T1[2][l], " ", T2[2][l-A.npdv])
-            end
         end
 
         res = undefOrePoly(s,A)
