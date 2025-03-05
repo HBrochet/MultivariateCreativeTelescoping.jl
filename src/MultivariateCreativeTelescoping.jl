@@ -10,6 +10,7 @@ using FLINT_jll: libflint
 
 include("globalstats.jl")
 include("primes.jl")
+include("DataStructure_missing.jl")
 # include("SLP.jl")
 
 include("TypeCoefficient.jl")
@@ -35,6 +36,8 @@ include("F5.jl")
 
 include("WeylClosure.jl")
 
+include("echelon_form.jl")
+include("Reductions.jl")
 include("RepresentativeInIntMod.jl")
 include("DerivRedMap.jl")
 include("MCT.jl")
@@ -45,6 +48,12 @@ include("CauchyInterpolation.jl")
 
 include("testfunctions.jl")
 # include("IndicialEqs.jl")
+
+# include("multivariate_rational_interpolation.jl")
+# include("multivariate_rational_interpolation2.jl")
+include("multivariate_rational_interpolation3.jl")
+include("multivariate_rational_interpolation_known_support.jl")
+
 @exportAll()
 
 end

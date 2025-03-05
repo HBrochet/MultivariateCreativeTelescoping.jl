@@ -115,7 +115,7 @@ function normal(a::UInt64, ctx::Nmod32Γ)
 end
 
 function convertn(x :: Integer,ctx :: Nmod32Γ)
-    return convert(mod(x,ctx.char),ctx)
+    return convert(mod(x,Int(ctx.char)),ctx)
 end
 
 
@@ -142,7 +142,6 @@ function add(ctx::Nmod32xΓ, a::UInt32, b::UInt32)
     c0 = a+b
     c1 = c0 - ctx.char
     d = max(c0, c1)
-    #@assert d%ctx.char == (a%ctx.char + b%ctx.char)%ctx.char
     return d
 end
 
@@ -209,8 +208,15 @@ Base.zero(ctx :: UnivRatFunModpCtx) = ctx.F(0)
 Base.iszero(x :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = x == ctx.F(0)
 Base.isone(x :: UnivRatFunModp, ctx :: UnivRatFunModpCtx) = x == ctx.F(1)
 
-function evaluate(a :: UnivRatFunModp, p :: Int) 
+function evaluate(a :: UnivRatFunModp, p :: T) where T 
     return Nemo.evaluate(Nemo.numerator(a,false),p)//Nemo.evaluate(Nemo.denominator(a,false),p)
+end
+
+function evaluate(a :: UnivRatFunModp, p :: Vector{T}) where T 
+    if length(p) > 1 
+        error("the vector p has size > 1")
+    end
+    return Nemo.evaluate(Nemo.numerator(a,false),p[1])//Nemo.evaluate(Nemo.denominator(a,false),p[1])
 end
 
 # ratfun mod large p 
@@ -308,6 +314,10 @@ Base.zero(ctx :: RatFunModpCtx) = ctx.F(0)
 Base.iszero(x :: RatFunModp, ctx :: RatFunModpCtx) = x == ctx.F(0)
 Base.isone(x :: RatFunModp, ctx :: RatFunModpCtx) = x == ctx.F(1)
 
+function evaluate(a :: RatFunModp, p :: Vector{T}) where T
+    return Nemo.evaluate(Nemo.numerator(a,false),p)//Nemo.evaluate(Nemo.denominator(a,false),p)
+end
+
 # ratfun mod large p 
 
 const RatFunModP = Generic.FracFieldElem{FpMPolyRingElem}
@@ -368,7 +378,9 @@ Base.zero(ctx :: RatFunQQCtx) = ctx.F(0)
 Base.iszero(x :: RatFunQQ, ctx :: RatFunQQCtx) = x == ctx.F(0)
 Base.isone(x :: RatFunQQ, ctx :: RatFunQQCtx) = x == ctx.F(1)
 
-
+function evaluate(a :: RatFunQQ, p :: Vector{T}) where T
+    return Nemo.evaluate(Nemo.numerator(a,false),p)//Nemo.evaluate(Nemo.denominator(a,false),p)
+end
 
 ## defining rational coefficient 
 struct QQCtx <: NmodLikeΓ{QQFieldElem,QQFieldElem} 

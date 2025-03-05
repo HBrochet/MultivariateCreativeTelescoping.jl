@@ -1,3 +1,13 @@
+struct MCTParam{B,C} end 
+
+function mct_param(;geobucket :: Val{B} = Val(true), debug :: Val{C} = Val(false)) where {B,C}
+    return MCTParam{B,C}()
+end
+
+use_geobucket(:: MCTParam{B,C}) where {B,C} = B 
+debug(::MCTParam{B,C}) where {B,C} = C 
+
+
 struct RepInIntMod{T,M}
     echelon :: Vector{OrePoly{T,M}}
     next_incr :: Vector{OrePoly{T,M}}
@@ -41,7 +51,7 @@ function GD_prereduction_init(G2 :: Vector{OrePoly{T,M}}, G1 :: Vector{OrePoly{T
     if length(G2) == 0 
         return OrePoly{T,M}[], OrePoly{T,M}[]
     end 
-    s = maximum([maximum([sum(m[i] for i in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv) - sum(m[i] for i in A.nrdv+1:A.nrdv+A.npdv) for m in mons(p)]) for p in G2])
+    s = maximum(maximum(sum(m[i] for i in A.nrdv+A.npdv+1:A.nrdv+2*A.npdv) - sum(m[i] for i in A.nrdv+1:A.nrdv+A.npdv) for m in mons(p)) for p in G2)
     if  sigma <= s 
         @warn "parameter sigma might be chosen too small" 
     end
@@ -161,39 +171,6 @@ function reduce_with_echelon_augmented!(echelon :: Vector{OrePoly{T,M}}, P :: Or
 end
 
 
-function add_echelon!(echelon :: Vector{OrePoly{T,M}}, P :: OrePoly{T,M}, A :: OreAlg; augmented = false, echelonvect = Vector{T}[], vect = T[],unitary = true ) where {T,M}
-    if length(P) == 0
-        return 
-    end
-    if augmented
-        if unitary
-            for i in 1:length(vect)
-                vect[i] = mul(vect[i], inv(coeff(P,1),ctx(A)),ctx(A))
-            end
-        end
-
-        for v in echelonvect 
-            push!(v, zero(ctx(A)))
-        end
-    end
-    if unitary
-        makemonic!(P,A)
-    end
-    for i in length(echelon):-1:1 
-        if lt(order(A),mon(P,1),mon(echelon[i],1))
-            insert!(echelon,i+1,P)
-            if augmented 
-                insert!(echelonvect,i+1,vect)
-            end
-            return
-        end 
-    end 
-    insert!(echelon,1,P)
-    if augmented
-        insert!(echelonvect,1,vect)
-    end
-end
-
 
 function mod_derivatives!(pol :: OrePoly{T,M},A :: OreAlg) where {T,M}
     toremove = Int[]
@@ -232,6 +209,7 @@ function GD_reduction1!(pol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}},A :: Ore
     end
     return pol
 end
+
 
 function separate(gb :: Vector{OrePoly{T,M}}, A::OreAlg) where {T, M}
     g1 = OrePoly{T,M}[]

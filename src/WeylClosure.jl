@@ -1,3 +1,32 @@
+struct WCParam{T,S} 
+    gb_param :: T 
+    bound :: Int
+    morestep :: Int
+end 
+
+function wc_param(;method ::Val{F} = Val(:f5),
+    bound :: Int = 1,
+    morestep :: Int  = 0,
+    geobucket ::Val{B} = Val(false),
+    stophol  :: Val{C} = Val(false),
+    stat :: Val{D} = Val(false),
+    debug :: Val{E} = Val(false)) where {B,C,D,E,F} 
+    if F == :f5 
+        param =  F5Param{B,C,D,E}()
+    elseif (F == :f4) || (F == :buchberger) 
+        param = F4Param{C,D,E}()
+    end
+    return WCParam{typeof(param),F}(param,bound,morestep) 
+end
+
+method(:: WCParam{T,S}) where {T,S} = S
+stophol(p:: WCParam) = stophol(p.gb_param)
+stat(p:: WCParam) = stat(p.gb_param)
+debug(p:: WCParam)  = debug(p.gb_param)
+
+
+
+
 function init_gb_sat(g :: Vector{OrePoly{K,M}},bound :: Int, i :: Int, A :: OreAlg) where {K,M}
     res = copy(g)
     res2 = OrePoly{K,M}[]
@@ -36,12 +65,18 @@ function saturation(g_ :: Vector{OrePoly{T,M}}, i :: Int, A :: OreAlg; bnd::Inte
     tmp = mul(A.pols_loc[1],parse_OrePoly(A.inp.locvars[1][1],A),A)
     tmp = sub(tmp,one(A),A)
     push!(g, tmp)
-    gb, lastpow = init_gb_sat(f5(g,A), bound,i,A)
-    if f4b 
-        gb = f4(gb,A)
-    else 
-        gb = f5(gb,A)
+    
+
+   
+    if method(param) == :buchberger
+        gb = Buchberger2(g,A,param = param.gb_param)
+    elseif method(param) == :f4
+        gb = f4(g,A,param = param.gb_param)
+    else
+        gb = f5(g,A,param = param.gb_param)
     end
+    gb, lastpow = init_gb_sat(gb, bound,i,A)
+
     res = filter(p -> mon(p,1)[i] == 0, gb) 
     @debug "gb initialized, it contains $(length(gb)) vectors"
     hol = isholonomic(res,A)
@@ -51,10 +86,12 @@ function saturation(g_ :: Vector{OrePoly{T,M}}, i :: Int, A :: OreAlg; bnd::Inte
             morestep -= 1 
         end
         update_gb_sat!(gb,lastpow,bound,i,A)
-        if f4b 
-            gb = f4(gb,A;stophol=stophol)
-        else 
-            gb = f5(gb,A,stophol=stophol)
+        if method(param) == :buchberger
+            gb = Buchberger2(gb,A,param = param.gb_param)
+        elseif method(param) == :f4
+            gb = f4(gb,A,param = param.gb_param)
+        else
+            gb = f5(gb,A,param = param.gb_param)
         end
         res = filter(p -> mon(p,1)[i] == 0, gb) 
         hol = isholonomic(res,A)
@@ -107,7 +144,7 @@ function weyl_closure_internal(gens::Vector{OrePoly{T,M}}, A :: OreAlg, init :: 
     nA = init.A
     sl = singular_locus(gens,A,init.SLI)
     if sl == one(A)
-        return f5(gens,A)
+        return f5(gens,A,param = param.gb_param)
     else 
         nemo_p = prod(fact[1] for fact in factor_squarefree(sl) )
         p = OrePoly([nemo_p],[makemon(-1,A)])

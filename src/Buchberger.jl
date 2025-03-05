@@ -16,7 +16,7 @@ function div!(f :: OrePoly, g :: Vector{OrePoly{K,M}} ,A :: OreAlg; full :: Bool
     while r <= length(f) 
         div = false
         for i in 1:length(g)
-            if divide(mon(g[i],1), mon(f,r),A)
+            if divide(mon(g[i],1), mon(f,r),A) && iscompatible(mon(g[i],1), mon(f,r),A)
                 div = true
                 f = reduce!(f,r, g[i], A)
 

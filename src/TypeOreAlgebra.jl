@@ -88,7 +88,7 @@ function OreAlg(;order :: String = "",
                                             varord,
                                             inp)
     
-    (polsloc, diff_pols_loc) = compute_locpol_and_derivs(locvars[2],tmpA)
+    (polsloc, diff_pols_loc) = Base.invokelatest(compute_locpol_and_derivs,locvars[2],tmpA)
 
     nomul_ = [sti[s] for s in nomul]
     return OreAlg{eltype1_ctx(ctx), typeof(ctx),M,typeof(ord)}(sti,
@@ -434,3 +434,59 @@ end
 function leadingterms(v :: Vector{OrePoly{T,M}}) where {T,M}
     return [OrePoly([coeff(p,1)],[mon(p,1)]) for p in v]
 end
+
+function is_polynomial(m ::OreMonVE,A :: OreAlg)
+    for i in 1:A.nrdv +A.npdv
+        if m[i] != 0 
+            return false 
+        end
+    end
+    return true 
+end
+
+### more on ReuseOrePoly
+
+function copy_to_OrePoly!(p :: ReuseOrePoly, A :: OreAlg)
+    ind = p.ind
+    pol = p.op 
+    if ind == 0 
+        return zero(A)
+    end
+    res = undefOrePoly(p.ind,A)
+    for i in 1:ind 
+        res[i] = pol[i]
+    end
+    p.ind = 0
+    return res 
+end
+
+
+function ReuseOrePoly(l :: Int,A :: OreAlg)
+    return ReuseOrePoly(undefOrePoly(l,A),0)
+end
+
+function max_deg_block(m :: OreMonVE, A::OreAlg)
+    return max_deg_block(order(A),m)
+end
+
+function max_deg_block(p :: OrePoly, A::OreAlg)
+    return max_deg_block(order(A),mon(p,1))
+end
+
+function unflatten(p :: OrePoly{T,K},A :: OreAlg) where {T,K} 
+    res = OrePoly{T,K}[] 
+    (c,m) = p[1]
+    tmp = OrePoly([c],[m])
+    for i in 2:length(p) 
+        if lt(order(A),mon(p,i), mon(tmp,length(tmp)))
+            push!(tmp, p[i])
+        else
+            push!(res, tmp)
+            (c,m) = p[i] 
+            tmp = OrePoly([c],[m])
+        end
+    end
+    push!(res,tmp)
+    return res 
+end
+ 
