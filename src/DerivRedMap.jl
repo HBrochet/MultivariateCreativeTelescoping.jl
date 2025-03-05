@@ -119,7 +119,7 @@ function der_red_map_precomp2(spol :: OrePoly, gb :: Vector{OrePoly{T,M}},A :: O
 
     spol_degx = sum(mon(red_dt,1)[i] for i in 2+A.npdv:1+2*A.npdv)
     spol = GD_reduction1!(spol,g1,A,geob,tmp_poly)
-    rho =  0
+    rho =  1
     ll = maximum(sum(mon(p,1)[i] for i in 2+A.npdv:1+2*A.npdv) for p in g2)
     s = max(max(red_dt_degx,0) + max(spol_degx,0),ll)
     if B 
