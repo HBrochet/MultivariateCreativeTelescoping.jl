@@ -100,14 +100,14 @@ end
     @test isholonomic(g,A)
 
     # # t
-    # A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]), poldiffvars=(["x"],["dx"]))
-    # ann = [parse_OrePoly("dt*(x-t)",A),parse_OrePoly("dx*(x-t)",A)]
-    # spol = parse_OrePoly("x",A)
-    # init = weyl_closure_init(A)
-    # gb = weyl_closure(ann,A,init)
-    # res = MCT(spol, gb, A)
-    # res2 = parse_OrePoly("t*dt-1",A)
-    # @test res == res2
+    A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]), poldiffvars=(["x"],["dx"]))
+    ann = [parse_OrePoly("dt*(x-t)",A),parse_OrePoly("dx*(x-t)",A)]
+    spol = parse_OrePoly("x",A)
+    init = weyl_closure_init(A)
+    gb = weyl_closure(ann,A,init)
+    res = MCT(spol, gb, A)
+    res2 = parse_OrePoly("t*dt-1",A)
+    @test res == res2
 
 
     # # SSW3
