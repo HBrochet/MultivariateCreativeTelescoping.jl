@@ -122,17 +122,17 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;p
                 bnd += 2
             end
         end
-        if npoints ==100
-            if same_den(param)
-                rcbl = random_cbl(ev_res,nA)
-                prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
-                println("random cbl")
-                println(prev_cbl)
-            else 
-                prev_res = cauchy_interpolation(ev_res,randpoints, A;prd = prd)
-            end
-            error("fin")
-        end
+        # if npoints ==100
+        #     if same_den(param)
+        #         rcbl = random_cbl(ev_res,nA)
+        #         prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
+        #         println("random cbl")
+        #         println(prev_cbl)
+        #     else 
+        #         prev_res = cauchy_interpolation(ev_res,randpoints, A;prd = prd)
+        #     end
+        #     error("fin")
+        # end
     end
     end
     end
