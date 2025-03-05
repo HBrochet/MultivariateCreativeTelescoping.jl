@@ -1,4 +1,5 @@
 
+
 mutable struct Spair{M}
     left :: Int                 # index of the left part in the current basis
     right :: Int                # right part
@@ -14,8 +15,7 @@ end
 
 
 # All data that we need during the F4 algorithm
-mutable struct PartialGB{T,M, Alg}
-
+mutable struct PartialGB{T,M, Alg,B,C,D}
     # must be indexed monomials (ie monomials are indices)
 
     alg :: Alg 
@@ -24,15 +24,17 @@ mutable struct PartialGB{T,M, Alg}
     newrels :: Vector{OrePoly{T,M}}        # new relations for which the S-pairs are not yet generated
     candidates :: Vector{OrePoly{T,M}}     # halfpairs to be reduced
     spairs :: Vector{Spair{M}} # spairs
-
-    function PartialGB{T, M, Alg}(
-        A :: Alg, generators :: Vector{OrePoly{T,M}}
-    ) where {T, M, Alg <: OreAlg}
+    param :: F4Param{B,C,D}
+    geob :: GeoBucket{T, M}
+    function PartialGB{T, M, Alg,B,C,D}(
+        A :: Alg, generators :: Vector{OrePoly{T,M}},param :: F4Param{B,C,D}
+    ) where {T, M, Alg <: OreAlg,B,C,D}
         gens = copy(generators)
         #reducebasis!(gens,A)
-        interreduce(A,gens,true)
+        geob = GeoBucket(zero(A))
+        gens2 = interreduce(A,gens,param,geob)
         new(A, OrePoly{T,M}[],
-            BitSet(), gens, OrePoly{T,M}[], Vector{Spair{M}}())
+            BitSet(), gens2, OrePoly{T,M}[], Vector{Spair{M}}(),param,geob)
     end
 end
 
@@ -43,19 +45,21 @@ function spair(pgb :: PartialGB, i :: Int, j :: Int,)
 
     thelcm = lcm(mon(p,1), mon(q,1))
 
-    # product rule 
-    if (thelcm == mon(p,1)*mon(q,1)) &&  commute(p,q,pgb.alg)
-        prod = true 
-    else 
-        prod = false
-    end
+    # product rule ignored as it is almost never useful
+
+    # if (thelcm == mon(p,1)*mon(q,1)) &&  commute(p,q,pgb.alg)
+    #     prod = true 
+    # else 
+    #     prod = false
+    # end
+    prod = false
 
     Spair{eltype_mo(pgb.alg)}(i, j, thelcm, prod, false)
 end
 
 
-function partialgb(generators, A :: OreAlg)
-    PartialGB{eltype_co(A), eltype_mo(A), typeof(A)}(A, generators)
+function partialgb(generators, A :: OreAlg,param :: F4Param{B,C,D}) where{B,C,D}
+    PartialGB{eltype_co(A), eltype_mo(A), typeof(A),B,C,D}(A, generators,param)
 end
 
 
@@ -67,7 +71,7 @@ function pushrel!(pgb :: PartialGB, rel :: OrePoly)
     # See also Lemma 25.1.9
 
     push!(pgb.basis, rel)
-    @debug "New relation with leading monomial $(mon(rel,1))"
+    debug(pgb.param) && @debug "New relation with leading monomial $(mon(rel,1).exp)"
     s = length(pgb.basis)
     if isempty(pgb.active)
         push!(pgb.active, s)
@@ -129,10 +133,11 @@ function pushrel!(pgb :: PartialGB, rel :: OrePoly)
     for sp in values(spbylcm)
         push!(pgb.spairs, sp)
     end
-
-    globalstats.counters[:f4_candidate_spairs] += length(spbylcm)
-    globalstats.counters[:f4_eliminated_spairs_with_GM] += s-1 - length(spbylcm) - ctr 
-    globalstats.counters[:f4_eliminated_spairs_with_prod_crit] += ctr
+    if stat(pgb.param)
+        globalstats.counters[:f4_candidate_spairs] += length(spbylcm)
+        globalstats.counters[:f4_eliminated_spairs_with_GM] += s-1 - length(spbylcm) - ctr 
+        globalstats.counters[:f4_eliminated_spairs_with_prod_crit] += ctr
+    end
 
 
     for i in pgb.active
@@ -151,7 +156,7 @@ end
 
 
 function generatespairs!(pgb :: PartialGB{M,T}) where {M,T}
-    @debug "generating s-pairs for $(length(pgb.newrels)) new relations"
+    debug(pgb.param) && @debug "generating s-pairs for $(length(pgb.newrels)) new relations"
 
     for rel in pgb.newrels
         isempty(rel) && continue
@@ -167,19 +172,50 @@ function generatespairs!(pgb :: PartialGB{M,T}) where {M,T}
     return
 end
 
-function selectspairs!(pgb :: PartialGB)
+function selectspairs!(pgb :: PartialGB, param :: F4Param)
     isempty(pgb.spairs) && return
 
+
     sort!(pgb.spairs, rev=true, order=order(pgb.alg))
-    
+
+    deg = max_deg_block(last(pgb.spairs).lcm,pgb.alg)
+
     ctr = 0 
-    while !isempty(pgb.spairs) && ctr < 10
+    while !isempty(pgb.spairs) && ctr < 1000
         sp = last(pgb.spairs)
-        push!(pgb.candidates, shift(pgb.basis[sp.left ], sp.lcm,pgb.alg))
-        push!(pgb.candidates, shift(pgb.basis[sp.right], sp.lcm,pgb.alg))
+        if max_deg_block(sp.lcm,pgb.alg) > deg 
+            break 
+        end
+        if geobucket(param)
+            push!(pgb.candidates, shift(pgb.basis[sp.left ], sp.lcm,pgb.alg,pgb.geob))
+            push!(pgb.candidates, shift(pgb.basis[sp.right], sp.lcm,pgb.alg,pgb.geob))
+        else
+            push!(pgb.candidates, shift(pgb.basis[sp.left ], sp.lcm,pgb.alg))
+            push!(pgb.candidates, shift(pgb.basis[sp.right], sp.lcm,pgb.alg))
+        end
         pop!(pgb.spairs)
         ctr += 1 
     end
+end
+
+#
+function selectspol!(pgb :: PartialGB)
+    isempty(pgb.spairs) && return zero(pgb.alg)
+
+    sort!(pgb.spairs, rev=true, order=order(pgb.alg))
+    
+    sp =  pop!(pgb.spairs)
+
+    l = pgb.basis[sp.left]
+    r = pgb.basis[sp.right]
+    lcm = sp.lcm 
+    if stat(pgb.param) 
+        globalstats.counters[:bbg_nb_spair] += 1
+    end
+    res = sub(mul(lcm/lm(l),l,pgb.alg),
+             mul(lcm/lm(r),r,pgb.alg),
+             pgb.alg)
+    return res
 end
 
 
@@ -190,45 +226,151 @@ function findnewrels!(pgb :: PartialGB)
 
     rows = pgb.candidates
 
-    @debug "symbolic preprocessing"
-    mx = symbolicpp(pgb.alg, rows, activebasis, true, true)
+    debug(pgb.param) && @debug "symbolic preprocessing"
+    mx = symbolicpp(pgb.alg, rows, activebasis, pgb.param,pgb.geob,true, true)
 
-    @debug "reducing a sparse $(length(mx.rows))×$(mx.nbcolumns) matrix"
-    reduce!(mx)
+    debug(pgb.param) && @debug "reducing a sparse $(length(mx.rows))×$(mx.nbcolumns) matrix"
+    reduce!(mx,pgb.param)
+    reducenewpivots!(mx,pgb.param)
     pgb.newrels = [row(mx, r) for r in mx.newpivots]
-
     empty!(pgb.candidates)
     return
 end
+
 
 """
     f4(gens :: Vector{OrePoly{T,M}}, A :: Alg)
 
 Return a reduced Gröbner basis of the left ideal generated by gens for the monomial order defined in A.
 """
-function f4(gens_ :: Vector{OrePoly{K,M}}, A :: Alg; stophol::Bool = false) where {K,M,Alg <: OreAlg}
-    gens = deepcopy(gens_)
-    pgb = partialgb(gens, A)
+function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param()) where {K,M,Alg <: OreAlg}
+    pgb = partialgb(gens, A,param)
     round = 0
-
-    while !iscomplete(pgb) || (stophol && isholonomic(pgb.basis,A))
-        #println("new round",stophol,isholonomic(pgb.basis,A))
+    while !iscomplete(pgb)
         round += 1
-        @debug "starting round $round"
+        if stophol(param) && isholonomic(pgb.basis,A)
+            debug(param) && @debug "The current partial gb generates a holonomic ideal"
+            delete_spairs_with_T!(pgb,A)
+        end
+
+        debug(param) && @debug "starting round $round, there are $(length(pgb.spairs)) spairs to be treated"
 
         generatespairs!(pgb)
-        selectspairs!(pgb)
+        selectspairs!(pgb,param)
         findnewrels!(pgb)
 
-        @debug "found $(length(pgb.newrels)) new relations"
+        debug(param) && @debug "found $(length(pgb.newrels)) new relations"
+    end
+
+    basis = [pgb.basis[i] for i in pgb.active]
+    stophol(param) && isholonomic(basis,A) && delete_op_with_T!(basis,A)
+    basis = interreduce(A, basis,param,pgb.geob)
+    # reducebasis!(basis,A)
+    sort!(basis, lt = (x,y) -> lt(order(A),x[1][2], y[1][2]), rev = true)
+    return basis
+end
+
+function f4_mri(A :: OreAlg,gen :: Vector{OrePoly{K,M}}, param :: F4Param) where {K,M}
+    # flatten the result to allow rational reconstruction with mri 
+    tmp =  f4(gen,A,param = param)
+    res = tmp[1]
+    for i in 2:length(tmp)
+        append!(res,tmp[i])
+    end
+    return res 
+end
+
+
+
+
+function Buchberger2(gens_ :: Vector{OrePoly{K,M}}, A :: Alg;param ::F4Param = f4_param()) where {K,M,Alg <: OreAlg}
+    gens = deepcopy(gens_)
+    pgb = partialgb(gens, A,param)
+    round = 0
+
+    while !iscomplete(pgb)
+        if stophol(param) && isholonomic(pgb.basis,A)
+            debug(param) && @debug "The current partial gb generates a holonomic ideal"
+            delete_spairs_with_T!(pgb,A)
+        end
+        round += 1
+        debug(param) && @debug "starting round $round, there are $(length(pgb.spairs)) spairs to be treated"
+
+        generatespairs!(pgb)
+        spol = selectspol!(pgb)
+        if iszero(spol) 
+            debug(param) && @debug "S-polynom is zero"
+            continue
+        end
+        
+        debug(param) && @debug "reducing S-polynom with lm $(lm(spol).exp)"
+        spol = div!(spol,pgb.basis,A,param=param)
+
+        if !iszero(spol)
+            makemonic!(spol,A)
+            push!(pgb.newrels,spol) 
+        end
+
+
+        debug(param) && @debug "found $(length(pgb.newrels)) new relation"
     end
 
     # globalstats.timings[:interreduction] += @elapsed begin
     #     basis = interreduce(ctx, [pgb.basis[i] for i in pgb.active])
     # end
-    basis = interreduce(A, [pgb.basis[i] for i in pgb.active])
-    #basis = [pgb.basis[i] for i in pgb.active]
+    # basis = interreduce(A, [pgb.basis[i] for i in pgb.active])
+    basis = [pgb.basis[i] for i in pgb.active] # todo: check what pgb.active is 
+    stophol(param) && isholonomic(basis,A) && delete_op_with_T!(basis,A)
     reducebasis!(basis,A)
     sort!(basis, lt = (x,y) -> lt(order(A),x[1][2], y[1][2]), rev = true)
     return basis
 end
+
+function Buchberger2_mri(A :: OreAlg,gen :: Vector{OrePoly{K,M}}, param :: F4Param) where {K,M}
+    # flatten the result to allow rational reconstruction with mri 
+    tmp =  Buchberger2(gen,A,param = param)
+    res = tmp[1]
+    for i in 2:length(tmp)
+        append!(res,tmp[i])
+    end
+    return res 
+end
+
+
+
+function delete_spairs_with_T!(pgb :: PartialGB, A :: OreAlg)
+    N = nvars(A)
+    hasT = Int[]
+    for (i,g) in enumerate(pgb.basis) 
+        if mon(g,1)[N] > 0 
+            push!(hasT,i)
+        end
+    end
+    todelete = Int[] 
+    for (i,s) in enumerate(pgb.spairs)
+        if (s.left in hasT) || (s.right in hasT)
+            push!(todelete,i)
+        end
+    end
+
+    reverse!(todelete)
+    for s in todelete
+        deleteat!(pgb.spairs,s)
+    end
+end
+
+function delete_op_with_T!(v :: Vector{OrePoly{C, M}},A:: OreAlg) where {C,M}
+    N = nvars(A)
+    todelete = Int[]
+    for (i,g) in enumerate(v) 
+        if mon(g,1)[N] > 0 
+            push!(todelete,i)
+        end
+    end
+    reverse!(todelete)
+    for s in todelete
+        deleteat!(v,s)
+    end
+end
+
+

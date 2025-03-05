@@ -1,30 +1,49 @@
+abstract type GBParam end 
+
+struct DefaultParam <: GBParam end 
+use_geobucket(:: DefaultParam) = true
+stophol(:: DefaultParam)= false
+stat(:: DefaultParam) = false
+debug(::DefaultParam) = false
 
 
 # Reduce mon r of pol f with pol g 
-function reduce!(f :: OrePoly, r :: Int, g :: OrePoly, A :: OreAlg) 
+function reduce!(f :: OrePoly, r :: Int, g :: OrePoly, A :: OreAlg;param :: GBParam = DefaultParam()) 
     mo = mon(f,r) / mon(g,1)
     co = mul(opp(coeff(f,r),ctx(A)), inv(coeff(g,1),ctx(A)),ctx(A))
     np = makepoly(co,mo)
     res = mul(np, g, A)
-    return add!(f, res, A)
+    tmp = add!(f, res, A) 
+
+    if stat(param)
+        globalstats.counters[:bbg_size_reducer] += length(res)
+        globalstats.counters[:bbg_size_m]+= sum(mo)
+        globalstats.counters[:bbg_deg_reducer] += maxdeg(res)
+    end
+    return tmp
 end
 
 
 
-function div!(f :: OrePoly, g :: Vector{OrePoly{K,M}} ,A :: OreAlg; full :: Bool = false) where {K,M}
+function div!(f :: OrePoly, g :: Vector{OrePoly{K,M}} ,A :: OreAlg; full :: Val{B} = Val(true),param :: GBParam = DefaultParam()) where {K,M,B}
     r=1 
     while r <= length(f) 
         div = false
         for i in 1:length(g)
-            if divide(mon(g[i],1), mon(f,r),A)
+            if divide(mon(g[i],1), mon(f,r),A) && iscompatible(mon(g[i],1), mon(f,r),A)
                 div = true
-                f = reduce!(f,r, g[i], A)
+                if stat(param)
+                    globalstats.counters[:bbg_nb_div] += 1
+                    add_reducer_globalstats!(i, mon(f,r)/mon(g[i],1))
+                end
+                
+                f = reduce!(f,r, g[i], A,param = param)
 
                 break
             end
         end
         if !div 
-            if !full 
+            if !B 
                 return f
             end
             r = r + 1
@@ -76,7 +95,7 @@ function buchberger(f :: Vector{OrePoly{K,M}}, A :: OreAlg) where {K,M}
 end
 
 # It assumes that every pivots have been found
-function reducebasis!(f :: Vector{OrePoly{K,M}}, A :: Alg) where {K,M, Alg <:OreAlg}
+function reducebasis!(f :: Vector{OrePoly{K,M}}, A :: Alg;param :: GBParam = DefaultParam()) where {K,M, Alg <:OreAlg}
     i = 1
 
     lenf = length(f)
@@ -86,7 +105,7 @@ function reducebasis!(f :: Vector{OrePoly{K,M}}, A :: Alg) where {K,M, Alg <:Ore
         tmp = f[lenf]
         f[lenf] = f[i]
         f[i] = tmp
-        f[lenf] = div!(f[lenf],f[1:lenf-1],A; full=true)
+        f[lenf] = div!(f[lenf],f[1:lenf-1],A,param=param)
         if length(f[lenf]) == 0 
             lenf = lenf -1 
             pop!(f)

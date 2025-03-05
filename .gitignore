@@ -5,3 +5,4 @@
 debugfile.jl
 /profiling
 /.vscode
+/statprof/

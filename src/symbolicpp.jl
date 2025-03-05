@@ -1,3 +1,17 @@
+struct F4Param{A,B,C,D} <: GBParam end 
+
+f4_param(;geobucket :: Val{A} = Val(false), 
+         stophol :: Val{B} = Val(false),
+         stat :: Val{C} = Val(false),
+         debug :: Val{D} = Val(false)) where {A,B,C,D} = F4Param{A,B,C,D}() 
+
+geobucket(:: F4Param{A,B,C,D}) where {A,B,C,D} = A 
+stophol(:: F4Param{A,B,C,D}) where {A,B,C,D} = B 
+stat(:: F4Param{A,B,C,D}) where {A,B,C,D} = C 
+debug(::F4Param{A,B,C,D}) where {A,B,C,D} = D
+
+
+
 # Building upon AbsOreMonomial define monomials indexed by integers
 
 struct IdxMon  <: AbsOreMonomial{Int}
@@ -18,9 +32,12 @@ end
 
 
 
-function monomialsubs(P :: OrePoly, dic :: Dict{M,IdxMon}) where {M <: AbsOreMonomial}
+Base.@propagate_inbounds function monomialsubs(P :: OrePoly, dic :: Dict{M,IdxMon}) where {M <: AbsOreMonomial}
     co = copy(coeffs(P))
-    mo = [dic[mon(P,i)] for i in 1:length(P)]
+    mo = Vector{IdxMon}(undef,length(P))
+     for i in 1:length(P)
+        mo[i] = dic[mon(P,i)]
+    end
     return OrePoly(co,mo)
 end
 
@@ -104,8 +121,9 @@ end
 function saturate!(A::alg,
                    rows::Vector{OrePoly{K,M}},
                    basis::Vector{OrePoly{K,M}},
-                   todo::Set{M}, done::Set{M}
-                   ) where {K,M, alg <: OreAlg}
+                   todo::Set{M}, done::Set{M},
+                   param ::F4Param,
+                   geob :: GeoBucket) where {K,M, alg <: OreAlg}
 
     # recursively find all possible reducers
 
@@ -118,19 +136,23 @@ function saturate!(A::alg,
 
         # search for a reducer
         # TODO benchmark and improve
-        for red in Iterators.reverse(basis)
+        for i in length(basis):-1:1
+            red = basis[i]
             lmred = mon(red,1)
             if divide(lmred, m,A)
+                if geobucket(param)
+                    sred = shift(red, m,A,geob)
+                else 
+                    sred = shift(red, m,A)
+                end
+                if stat(param) 
+                    globalstats.counters[:f4_nb_reducer_computed] += 1
+                    globalstats.counters[:f4_size_reducer] += length(sred)
+                    globalstats.counters[:f4_size_m]+= sum(m/lmred)
+                    globalstats.counters[:f4_deg_reducer] += maxdeg(sred)
+                    add_reducer_globalstats!(i, m/lmred)
+                end
 
-                sred = shift(red, m,A)
-                # println("new line with $(length(sred)) monomials and degree $(sum(mon(sred,1)))")
-                # println("mon $(m)")
-                # prettyprint(red,A)
-                # prettyprint(sred,A)
-
-                # if length(rows) > 20 
-                #     error("fin")
-                # end
                 pushrow!(A, rows, sred, todo, done)
                 break
             end
@@ -150,8 +172,8 @@ end
 #the pivots and normalize them if required.
 
 function f4matrix(A::alg,
-                  rows::Vector{OrePoly{K,M}},
-                  monomialset::Set{M}, donotpivot::Set{M},
+                  rows_::Vector{OrePoly{K,M}},
+                  monomialset::Set{M}, donotpivot::BitSet,
                   inputrows::BitSet
                   ) where {K,M, alg <: OreAlg}
 
@@ -164,11 +186,14 @@ function f4matrix(A::alg,
     end
 
     # Better to do it in place?
-    rows = [monomialsubs(r, monomialtoidx) for r in rows]
-    # Among all possible pivots for a column, we choose the last
+    rows = Vector{OrePoly{K,IdxMon}}(undef,length(rows_))
+    for i in 1:length(rows_)
+        rows[i] = monomialsubs(rows_[i], monomialtoidx)
+    end 
+        # Among all possible pivots for a column, we choose the last
     pivots = zeros(Int, length(monomials))
     for (i, row) in enumerate(rows)
-        #IdxMon(i) ∈ donotpivot && continue
+        IdxMon(i) ∈ donotpivot && continue
         pivots[mon(row,1)] = i
     end
 
@@ -181,6 +206,7 @@ function f4matrix(A::alg,
                 mult = inv(lc, ctx(A))
                 newco = [mul(mult, c,ctx(A)) for c in row.coeffs]
                 rows[p] = OrePoly(newco,mons(row))
+                #todo optimiser
             end
         end
     end
@@ -212,8 +238,10 @@ end
 function symbolicpp(A::alg,
     pols::Vector{OrePoly{K,M}},
     basis::Vector{OrePoly{K,M}},
+    param ::F4Param,
+    geob :: GeoBucket,
     interreduction::Bool=true,
-    spairrecution::Bool=false,
+    spairrecution::Bool=false
    ) where {alg <: OreAlg, K, M}
 
     isempty(pols) && error("nothing to preprocess")
@@ -223,9 +251,11 @@ function symbolicpp(A::alg,
     todo = Set{M}()
     done = Set{M}()
     inputrows = BitSet()
-
     for (i, p) in enumerate(pols)
         if spairrecution
+            if stat(param)
+                globalstats.counters[:f4_nb_reducer_computed] += 1
+            end
             # in F4, we reduce together a bunch of half-S-pairs. In this case,
             # we do not need to search a reducer for leading terms, because it
             # is already reduced by the other half.
@@ -235,13 +265,15 @@ function symbolicpp(A::alg,
         push!(inputrows, length(rows))
     end
 
-    saturate!(A, rows, basis, todo, done)
+    saturate!(A, rows, basis, todo, done,param,geob)
 
-    return f4matrix(A, rows, done, interreduction ? Set{M}() : inputrows, inputrows)
+    return f4matrix(A, rows, done, interreduction ? BitSet() : inputrows, inputrows)
 end
 
 function interreductionmx(A :: OreAlg,
                           basis::Vector{OrePoly{I, T}},
+                          param :: F4Param,
+                          geob :: GeoBucket
                           ) where {I, T}
 
 
@@ -263,9 +295,15 @@ function interreductionmx(A :: OreAlg,
     for (i, p) in enumerate(basis)
         pushrow!(A, rows, p, todo, done)
         push!(inputrows, length(rows))
-        saturate!(A, rows, currentbasis, todo, done)
+        saturate!(A, rows, currentbasis, todo, done,param,geob)
         push!(currentbasis, p)
     end
 
-    return f4matrix(A, rows, done, Set{T}(), inputrows)
+    return f4matrix(A, rows, done, BitSet(), inputrows)
+end
+
+
+function shift(P :: OrePoly{K,M}, m :: M, A :: alg,geob :: GeoBucket) where {K,M,alg <: OreAlg}
+    addmul_geobucket!(geob,one(ctx(A)),m/mon(P,1),P,A)
+    return normalform(geob,A)
 end

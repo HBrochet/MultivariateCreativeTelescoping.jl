@@ -25,6 +25,12 @@ function evaluate_many(r :: Generic.FracFieldElem{fpPolyRingElem}, v :: Vector{U
 end
 
 
+function evaluate(pol :: fpMPolyRingElem, v:: Vector{fpFieldElem})
+    z = @ccall libflint.nmod_mpoly_evaluate_all_ui(pol::Ref{fpMPolyRingElem}, v::Ptr{fpFieldElem}, parent(pol)::Ref{fpMPolyRing})::UInt
+    return base_ring(parent(pol))(z)
+end
+
+
 # slong _nmod_poly_hgcd(mp_ptr *M, slong *lenM, mp_ptr A, slong *lenA, mp_ptr B, slong *lenB, mp_srcptr a, slong lena, mp_srcptr b, slong lenb, nmod_t mod)
 # function half_gcd(a :: fpPolyRingElem, b :: fpPolyRingElem)
 #     p = parent(a)

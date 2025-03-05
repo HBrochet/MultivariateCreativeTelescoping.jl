@@ -1,4 +1,13 @@
-function compute_with_CRT(f :: Function, A :: OreAlg, args...)
+struct CRTParam{A} end 
+
+function crt_param(;tracer :: Val{A} = Val(false)) where {A}
+    return CRTParam{A}()
+end
+
+tracer(p :: CRTParam{A}) where {A} = A 
+
+
+function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam = crt_param())
     nprime = 1
     globalstats.counters[:number_primes] += 1
     primes_ = [primes[1]]
@@ -9,9 +18,20 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...)
     if ctx(A) isa RatFunCtx
         nA = change_alg_char_ratfun(prime,A)
         R = Native.GF(prime)
-        res_modp = [f(change_coefficient_field(R,nA, args...)...)]
+        if tracer(param)
+            tmp, trace = f(change_coefficient_field(R,nA, args...)...;tracer=Val(true))
+            res_modp = [tmp]
+        else 
+            res_modp = [f(change_coefficient_field(R,nA, args...)...)]
+        end
     elseif ctx(A) isa QQCtx
         nA = change_alg_char_QQ(prime,A)
+        if tracer(param)
+            tmp, trace = f(change_coefficient_field(nA, args...)...;tracer=Val(true))
+            res_modp = [tmp]
+        else 
+            res_modp = [f(change_coefficient_field(nA, args...)...)]
+        end
         res_modp = [f(change_coefficient_field(nA,args...)...)]
     end
     let prev_res
@@ -38,7 +58,7 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...)
                 bound += 1 
             end
         end
-        # if nprime == 10
+        # if nprime == 5
         #     # for i in 1:5 
         #     #     prettyprint(res_modp[i],A)
         #     # end
@@ -57,10 +77,18 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...)
         if ctx(A) isa RatFunCtx
             nA = change_alg_char_ratfun(prime,A)
             R = Native.GF(prime)
-            push!(res_modp, f(change_coefficient_field(R,nA, args...)...))
+            if tracer(param)
+                push!(res_modp, f(trace,change_coefficient_field(R,nA, args...)...))
+            else 
+                push!(res_modp, f(change_coefficient_field(R,nA, args...)...))
+            end
         elseif ctx(A) isa QQCtx
             nA = change_alg_char_QQ(prime,A)
-            push!(res_modp, f(change_coefficient_field(nA,args...)...))
+            if tracer(param)
+                push!(res_modp, f(trace,change_coefficient_field(nA,args...)...))
+            else 
+                push!(res_modp, f(change_coefficient_field(nA,args...)...))
+            end
         end
     end
     end
@@ -73,21 +101,21 @@ function crt(vec :: Vector{OrePoly{K,M}}, primes_ :: Vector{Int}, A :: OreAlg) w
     prodp = prod(primes)
     for i in 1:length(vec[1])
         num = zero(ctx(A).F)
-        term1 = numerator(coeff(vec[1],i),false)
+        term1 = Nemo.numerator(coeff(vec[1],i))
         for j in 1:length(term1)
-            cs = [ZZ(Nemo.coeff(numerator(coeff(vec[k],i),false), j).data) for k in 1:length(vec)]
+            cs = [ZZ(Nemo.coeff(Nemo.numerator(coeff(vec[k],i)), j).data) for k in 1:length(vec)]
             c = Nemo.crt(cs, primes)
             c = Nemo.reconstruct(c,prodp)
-            num += ctx(A).F(ctx(A).R([numerator(c,false)],[exponent_vector(term1,j)])) / ctx(A).F(Nemo.denominator(c,false))
+            num += ctx(A).F(ctx(A).R([Nemo.numerator(c)],[exponent_vector(term1,j)])) / ctx(A).F(Nemo.denominator(c))
         end
 
         den = zero(ctx(A).F)
-        term1 = Nemo.denominator(coeff(vec[1],i),false)
+        term1 = Nemo.denominator(coeff(vec[1],i))
         for j in 1:length(term1)
-            cs = [ZZ(Nemo.coeff(Nemo.denominator(coeff(vec[k],i),false), j).data) for k in 1:length(vec)]
+            cs = [ZZ(Nemo.coeff(Nemo.denominator(coeff(vec[k],i)), j).data) for k in 1:length(vec)]
             c = Nemo.crt(cs, primes)
             c = Nemo.reconstruct(c,prodp)
-            den += ctx(A).F(ctx(A).R([numerator(c,false)],[exponent_vector(term1,j)])) / ctx(A).F(Nemo.denominator(c,false))
+            den += ctx(A).F(ctx(A).R([Nemo.numerator(c)],[exponent_vector(term1,j)])) / ctx(A).F(Nemo.denominator(c))
         end
 
         push!(cos, num/den)
