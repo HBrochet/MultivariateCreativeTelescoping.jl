@@ -1,7 +1,7 @@
 
 function MCT_internal(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg,param :: MCTParam) where {T,M}
     push!(A.nomul,1)
-    par = ci_param(comp = Val(:medium), same_den = Val(false))
+    par = ci_param(comp = Val(:fast), same_den = Val(false))
     der_map, spol = compute_with_cauchy_interpolation(der_red_map, A, spol, gb,param,param=par)
     debug(param) && @debug "der_red_map successfully reconstructed, starting to compute the LDE"
     deleteat!(A.nomul, length(A.nomul))
@@ -31,7 +31,7 @@ end
 function find_LDE_by_interpolation(der_map :: Dict{M,OrePoly{T,M}}, spol :: OrePoly{T,M}, A :: OreAlg) where {T,M}
     rels, den = find_first_lin_dep_derivatives(der_map,spol,A)
     mat = mct_op_to_mat(rels, A)
-    par = ci_param(;denisone=Val(true))
+    par = ci_param(;denisone=Val(true), comp = Val(:fast),same_den=Val(true))
     res = compute_with_cauchy_interpolation(my_kernel,A,mat,param=par)
     for i in 1:length(res)
         coeffs(res)[i] = coeffs(res)[i] * ctx(A).F(den)^(mons(res)[i][1]+1)
