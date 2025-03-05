@@ -1,6 +1,6 @@
 struct F5Param{B,C,D,E} <: GBParam end 
 
-f5_param(;geobucket ::Val{B} = Val(true),
+f5_param(;geobucket ::Val{B} = Val(false),
          stophol  :: Val{C} = Val(false),
          stat :: Val{D} = Val(false),
          debug :: Val{E} = Val(false)) where {B,C,D,E} = F5Param{B,C,D,E}() 
@@ -266,6 +266,10 @@ function f5(gen :: Vector{OrePoly{K,M}}, A :: OreAlg; param :: F5Param = f5_para
 end
 
 function f5(A :: OreAlg,gen :: Vector{OrePoly{K,M}}; param :: F5Param = f5_param()) where {K,M} 
+    return f5(gen,A,param = param)
+end
+
+function f5(A :: OreAlg,gen :: Vector{OrePoly{K,M}}, param :: F5Param) where {K,M} 
     return f5(gen,A,param = param)
 end
 

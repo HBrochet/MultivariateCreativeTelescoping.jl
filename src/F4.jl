@@ -172,7 +172,7 @@ function generatespairs!(pgb :: PartialGB{M,T}) where {M,T}
     return
 end
 
-function selectspairs!(pgb :: PartialGB)
+function selectspairs!(pgb :: PartialGB, param :: F4Param)
     isempty(pgb.spairs) && return
 
 
@@ -186,8 +186,13 @@ function selectspairs!(pgb :: PartialGB)
         if max_deg_block(sp.lcm,pgb.alg) > deg 
             break 
         end
-        push!(pgb.candidates, shift(pgb.basis[sp.left ], sp.lcm,pgb.alg,pgb.geob))
-        push!(pgb.candidates, shift(pgb.basis[sp.right], sp.lcm,pgb.alg,pgb.geob))
+        if geobucket(param)
+            push!(pgb.candidates, shift(pgb.basis[sp.left ], sp.lcm,pgb.alg,pgb.geob))
+            push!(pgb.candidates, shift(pgb.basis[sp.right], sp.lcm,pgb.alg,pgb.geob))
+        else
+            push!(pgb.candidates, shift(pgb.basis[sp.left ], sp.lcm,pgb.alg))
+            push!(pgb.candidates, shift(pgb.basis[sp.right], sp.lcm,pgb.alg))
+        end
         pop!(pgb.spairs)
         ctr += 1 
     end
@@ -251,7 +256,7 @@ function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param(
         debug(param) && @debug "starting round $round, there are $(length(pgb.spairs)) spairs to be treated"
 
         generatespairs!(pgb)
-        selectspairs!(pgb)
+        selectspairs!(pgb,param)
         findnewrels!(pgb)
 
         debug(param) && @debug "found $(length(pgb.newrels)) new relations"

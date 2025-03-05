@@ -684,7 +684,12 @@ function evaluate_parameter_many(mat :: Generic.MatSpaceElem{Generic.FracFieldEl
     end
     return res
 end
+
 function evaluate_parameter_many(p :: MCTParam, v :: Vector{UInt}, nA :: OreAlg;denisone ::Val{T}= Val(false)) where T
+    return [p for i in 1:length(v)] 
+end
+
+function evaluate_parameter_many(p :: F5Param, v :: Vector{UInt}, nA :: OreAlg;denisone ::Val{T}= Val(false)) where T
     return [p for i in 1:length(v)] 
 end
 

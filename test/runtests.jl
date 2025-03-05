@@ -80,8 +80,7 @@ end
     p2 = parse_OrePoly("x*dx^2-dx+a^2*x",A)
     g = [p1,p2]
     gb1 = f4(g,A)
-    sgb = sigbasis(g,A)
-    gb2 = sgbtogb(sgb,A)
+    gb2 = f5(g,A)
     @test gb1 == gb2
 end
 
@@ -100,37 +99,42 @@ end
     g = weyl_closure(gens,A,init)
     @test isholonomic(g,A)
 
-    # t
-    A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]), poldiffvars=(["x"],["dx"]))
-    ann = [parse_OrePoly("dt*(x-t)",A),parse_OrePoly("dx*(x-t)",A)]
-    spol = parse_OrePoly("x",A)
-    init = weyl_closure_init(A)
-    gb = weyl_closure(ann,A,init)
-    res = MCT(spol, gb, A)
-    res2 = parse_OrePoly("t*dt-1",A)
-    @test res == res2
-
-
-    # # SSW3
-    A = OreAlg(order = "lex dt > grevlex x y > grevlex dx dy",ratdiffvars=(["t"],["dt"]),poldiffvars = (["x","y"],["dx","dy"]))
-    s = "(t*x^2*y^2+t*x*y^2+t*x^2+t*y^2+t*x-x*y+t)"
-    ann = [parse_OrePoly("dt*"*s,A),parse_OrePoly("dx*"*s,A),parse_OrePoly("dy*"*s,A)]
-    spol = parse_OrePoly("(-x^2*y^2+x^2+y^2-1)",A)
-    init = weyl_closure_init(A)
-    gb = weyl_closure(ann,A,init)
-    res = MCT(spol, gb, A)
-
-
-    
+    # # t
+    # A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]), poldiffvars=(["x"],["dx"]))
+    # ann = [parse_OrePoly("dt*(x-t)",A),parse_OrePoly("dx*(x-t)",A)]
+    # spol = parse_OrePoly("x",A)
+    # init = weyl_closure_init(A)
+    # gb = weyl_closure(ann,A,init)
+    # res = MCT(spol, gb, A)
     # res2 = parse_OrePoly("t*dt-1",A)
     # @test res == res2
 
+
+    # # SSW3
+    # A = OreAlg(order = "lex dt > grevlex x y > grevlex dx dy",ratdiffvars=(["t"],["dt"]),poldiffvars = (["x","y"],["dx","dy"]))
+    # s = "(t*x^2*y^2+t*x*y^2+t*x^2+t*y^2+t*x-x*y+t)"
+    # ann = [parse_OrePoly("dt*"*s,A),parse_OrePoly("dx*"*s,A),parse_OrePoly("dy*"*s,A)]
+    # spol = parse_OrePoly("(-x^2*y^2+x^2+y^2-1)",A)
+    # init = weyl_closure_init(A)
+    # gb = weyl_closure(ann,A,init)
+    # res = MCT(spol, gb, A)
     
+    # 3-reg graphs
+    Rpt = OreAlg(order = "lex dt > grevlex p1 p2 p3 > grevlex d1 d2 d3",
+                   ratdiffvars = (["t"], ["dt"]),
+                   poldiffvars = (["p1", "p2", "p3"], ["d1", "d2", "d3"])
+                  )
+    Gstring = "[0+(p1-1/2*t*p1^2+t+1/2*t*p2)*1+(t*p1)*d1+(t)*d2+(-1/2*t)*d1^2, 0+(t)*d1+(-t*p1+p2)*1, 0+(p3-t)*1, 0+(-1/6*p1^3+p1+1/2*p1*p2-1/3*p3)*1+(-1)*d1*d2+(1/6)*d1^3+(1/2*p1^2-1-1/2*p2)*d1+(p1)*d2+(1)*d3+(-1/2*p1)*d1^2+(1)*dt]"
+    G = parse_vector_OrePoly(Gstring, Rpt)
+    B = f4(G, Rpt)
+    res = MCT(one(Rpt), B, Rpt)
+    res2 = parse_OrePoly("(9*t^7 + 18*t^5 - 18*t^3)*dt^2 + (3*t^10 + 18*t^8 + 9*t^6 - 18*t^4 - 78*t^2 + 24)*dt + (-t^11 - 4*t^9 + 8*t^5 - 4*t^3)",Rpt)
+    @test res == res2
     
 end
 
 
-@testset begin 
+@testset "Cauchy interpolation" begin 
     A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]), poldiffvars=(["x"],["dx"]),char=primes[1])
 
     p = parse_OrePoly("t",A)
@@ -146,37 +150,32 @@ end
 
 ### test for mri 
 
+@testset "Multivariate rational interpolation" begin 
+    A = OreAlg(order = "grevlex x y dx dy",poldiffvars=(["x","y"],["dx","dy"]),ratvars=["s","t"],char=primes[1])
 
-# global ctr = 0
+    p = parse_OrePoly("s^2*(t+1)/(s+1)/(t+2)*y^2 + (t^2+1)*(s+1)/(s^4*t +1)",A)
+    
+    q = parse_OrePoly("s^2*(t+1)/(s+1)/(t+2)*y^2 + (t^2+1)*(s+1)/(s^4*t)",A)
+    
+    # q0 = parse_OrePoly("s^2*(t+1)",A)
+    # q0b = parse_OrePoly("t^2*(s+1)",A)
+    # q1 = parse_OrePoly("s^2*(t+1)/t^7",A)
+    # r = parse_OrePoly("1/s",A)
+    # s = parse_OrePoly("(s^2 + t^2) /(s^3 - t^2*s)",A)
+    # t = parse_OrePoly("((s+1)^2 + (t+1)^2)/((s+1)^3 - (t+1)^2*(s+1))",A) # 31
+    # u = parse_OrePoly("t*(s+1)^10/(t+1)^15",A) #378
+    # v = parse_OrePoly("1/(s^2*t^2)",A) # 23 ?? 
+    
+    function test(A,p)
+        return p
+    end
+    
+    res1 = multivariate_rational_interpolation(test,A,p)
+    @test res1 == p 
 
-# A = OreAlg(order = "grevlex x y dx dy",poldiffvars=(["x","y"],["dx","dy"]),ratvars=["s","t"],char=primes[1])
-
-# p = parse_OrePoly("s^2*(t+1)/(s+1)/(t+2)*y^2 + (t^2+1)*(s+1)/(s^4*t +1)",A)
-
-# q = parse_OrePoly("s^2*(t+1)/(s+1)/(t+2)*y^2 + (t^2+1)*(s+1)/(s^4*t)",A)
-
-# q0 = parse_OrePoly("s^2*(t+1)",A)
-# q0b = parse_OrePoly("t^2*(s+1)",A)
-
-
-# q1 = parse_OrePoly("s^2*(t+1)/t^7",A)
-
-# r = parse_OrePoly("1/s",A)
-
-# s = parse_OrePoly("(s^2 + t^2) /(s^3 - t^2*s)",A)
-
-# t = parse_OrePoly("((s+1)^2 + (t+1)^2)/((s+1)^3 - (t+1)^2*(s+1))",A) # 31
-
-# u = parse_OrePoly("t*(s+1)^10/(t+1)^15",A) #378
-
-# v = parse_OrePoly("1/(s^2*t^2)",A) # 23 ?? 
-
-# function test(A,p)
-#     global ctr += 1
-#     return p
-# end
-
-# res = multivariate_rational_interpolation(test,A,q0)
+    res2 = multivariate_rational_interpolation(test,A,q)
+    @test res2 == q
+end
 
 
 

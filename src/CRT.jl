@@ -27,10 +27,10 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam =
     elseif ctx(A) isa QQCtx
         nA = change_alg_char_QQ(prime,A)
         if tracer(param)
-            tmp, trace = f(change_coefficient_field(R,nA, args...)...;tracer=Val(true))
+            tmp, trace = f(change_coefficient_field(nA, args...)...;tracer=Val(true))
             res_modp = [tmp]
         else 
-            res_modp = [f(change_coefficient_field(R,nA, args...)...)]
+            res_modp = [f(change_coefficient_field(nA, args...)...)]
         end
         res_modp = [f(change_coefficient_field(nA,args...)...)]
     end

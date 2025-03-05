@@ -1,14 +1,17 @@
 
-struct CIParam{A,B} end 
+struct CIParam{A,B,C,D} end 
 
-function ci_param(denisone :: Val{A} = Val(false),
-                  tracer :: Val{B} = Val(false)) where {A,B}
-    return CIParam{A,B}()
+function ci_param(;denisone :: Val{A} = Val(false),
+                  tracer :: Val{B} = Val(false),
+                  comp :: Val{C} = Val(:medium),
+                  same_den :: Val{D} = Val(false)) where {A,B,C,D}
+    return CIParam{A,B,C,D}()
 end
 
-denisone(p :: CIParam{A,B}) where {A,B} = A
-tracer(p :: CIParam{A,B}) where {A,B} = B 
-
+denisone(p :: CIParam{A,B,C,D}) where {A,B,C,D} = A
+tracer(p :: CIParam{A,B,C,D}) where {A,B,C,D} = B 
+comp(p :: CIParam{A,B,C,D}) where {A,B,C,D} = C
+same_den(p :: CIParam{A,B,C,D}) where {A,B,C,D} = D
 
 # It assumes that A has only one parameter
 # the function f should be called as f(ev(A), ev(arg1...),arg2) where ev evaluates the parameter
@@ -17,10 +20,18 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;p
     randpoints = Int[]
     npoints = 1
     bound = 1 
+    if comp(param) == :fast 
+        bnd = 2^bound + 1
+    elseif comp(param) == :medium 
+        bnd = bound^2 + 1
+    else # comp(param) = :slow 
+        bnd = bound + 1
+    end
     succeeded = false
     globalstats.counters[:number_evaluation] += 1
 
     let prev_cbl
+    let prev_res
 
     glen = guess_length(args...)
     nA = evaluate_parameter_algebra(1,A) # first argument is not needed unless there are variables T in A
@@ -68,44 +79,61 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;p
         push!(ev_res, re)
 
         # trying interpolation
+
         if succeeded 
             # @debug "interpolation to reconstruct stable mon set"
-            rcbl = random_cbl(ev_res,nA)
-            cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
-            if Nemo.denominator(cbl,false) == Nemo.denominator(prev_cbl,false)
-                ev_den = evaluate_parameter_cbl(cbl,randpoints,A)
-                den = Nemo.denominator(cbl,false)
-                return cauchy_interpolation_known_den(ev_res, randpoints,ev_den,den, A)
+            if same_den(param)
+                rcbl = random_cbl(ev_res,nA)
+                cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
+                if Nemo.denominator(cbl,false) == Nemo.denominator(prev_cbl,false)
+                    ev_den = evaluate_parameter_cbl(cbl,randpoints,A)
+                    den = Nemo.denominator(cbl,false)
+                    return cauchy_interpolation_known_den(ev_res, randpoints,ev_den,den, A)
+                end
+                prev_cbl = cbl
+            else 
+                res = cauchy_interpolation(ev_res,randpoints, A;prd = prd)
+                if res == prev_res 
+                    return res 
+                end
             end
-            prev_cbl = cbl
             # @debug "reconstructions don't match, trying another point"
             succeeded = false
-        elseif npoints == 2^bound + 1
+        elseif npoints == bnd
             try 
                 # @debug "interpolation to reconstruct stable mon set"
-                rcbl = random_cbl(ev_res,nA)
-                prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
+                if same_den(param)
+                    rcbl = random_cbl(ev_res,nA)
+                    prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
+                else 
+                    prev_res = cauchy_interpolation(ev_res,randpoints, A;prd = prd)
+                end
                 succeeded = true
                 # @debug "success, trying one more point"
             catch 
                 # @debug "failure, trying more points"
             end 
             bound += 1
+            if comp(param) == :fast 
+                bnd = 2^bound + 1
+            elseif comp(param) == :medium 
+                bnd = bound^2 + 1
+            else # comp(param) = :slow 
+                bnd += 2
+            end
         end
-        # if npoints ==2
-        #     # println("randpoints")
-        #     # println(randpoints)
-        #     # print("evres")
-        #     # prettyprint(ev_res,nA)
-        #     @debug "interpolation to reconstruct stable mon set"
-        #     rcbl = random_cbl(ev_res,nA)
-        #     prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
-        #     println("random cbl")
-        #     println(prev_cbl)
-        #     succeeded = true
-        #     @debug "success, trying one more point"
-        #     error("fin")
-        # end
+        if npoints ==100
+            if same_den(param)
+                rcbl = random_cbl(ev_res,nA)
+                prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
+                println("random cbl")
+                println(prev_cbl)
+            else 
+                prev_res = cauchy_interpolation(ev_res,randpoints, A;prd = prd)
+            end
+            error("fin")
+        end
+    end
     end
     end
 end
@@ -195,8 +223,8 @@ end
 
 function cauchy_interpolation(v :: Vector{UInt32}, points :: Vector{Int}, A :: OreAlg; prd ::Union{fpPolyRingElem,Nothing} = nothing)
     R = base_ring(ctx(A).R) 
-    ev = [R(Int(c)) for c in v]
     evp = [R(p) for p in points]
+    ev = [R(Int(c)) for c in v]
     num, den = cauchy_interpolation(ctx(A).R, ctx(A).vars[1], evp, ev, div(length(points), 2),prd = prd)
     return ctx(A).F(num) / ctx(A).F(den)
 end
@@ -223,18 +251,86 @@ function cauchy_interpolation_mri(pol :: Vector{OrePoly{K,M}}, points :: Vector{
     return OrePoly(cs,ms)
 end
 
-function cauchy_interpolation(vec :: Vector{Dict{M,OrePoly{T,M}}}, randpoints :: Vector{Int}, A :: OreAlg; prd ::Union{fpPolyRingElem,Nothing} = nothing)  where {T,M}
-    res = Dict{M,OrePoly{eltype_co(A),M}}()
-    for m in keys(vec[1])
-        tmp = [vec[i][m] for i in 1:length(randpoints)]
-        res[m] = cauchy_interpolation(tmp, randpoints, A,prd = prd)
+function cauchy_interpolation(vec :: Vector{Vector{OrePoly{T,M}}}, randpoints :: Vector{Int}, A :: OreAlg; prd ::Union{fpPolyRingElem,Nothing} = nothing)  where {T,M}
+    R = base_ring(ctx(A).R) 
+    evp = [R(p) for p in randpoints]
+    F = ctx(A).F 
+    var = ctx(A).vars[1]
+
+    d = div(length(randpoints), 2)
+    l = length(vec[1])
+    res = Vector{OrePoly{eltype_co(A),M}}(undef,l) 
+    for i in 1:l
+        ll = length(vec[1][i])
+        pol = undefOrePoly(ll,A)
+        for j in 1:ll 
+            evs = [R(coeff(vec[k][i],j)) for k in 1:length(vec)]
+            num,den = cauchy_interpolation(ctx(A).R,var,evp,evs,d,prd = prd)
+            pol[j] = (F(num) / F(den), mon(vec[1][i],j))
+        end
+        res[i] = pol  
     end
     return res 
 end
 
+function cauchy_interpolation(vec :: Vector{OrePoly{T,M}}, randpoints :: Vector{Int}, A :: OreAlg; prd ::Union{fpPolyRingElem,Nothing} = nothing)  where {T,M}
+    R = base_ring(ctx(A).R) 
+    evp = [R(p) for p in randpoints]
+    F = ctx(A).F 
+    var = ctx(A).vars[1]
+
+    d = div(length(randpoints), 2)
+    l = length(vec[1])
+    res = undefOrePoly(l,A) 
+    for i in 1:l
+        evs = [R(coeff(vec[k],i)) for k in 1:length(vec)]
+        num,den = cauchy_interpolation(ctx(A).R,var,evp,evs,d,prd = prd)
+        res[i] = (F(num) / F(den), mon(vec[1],i))
+    end
+    return res 
+end
+
+
+function cauchy_interpolation(vec :: Vector{Dict{M,OrePoly{T,M}}}, randpoints :: Vector{Int}, A :: OreAlg; prd ::Union{fpPolyRingElem,Nothing} = nothing)  where {T,M}
+    R = base_ring(ctx(A).R) 
+    evp = [R(p) for p in randpoints]
+    F = ctx(A).F 
+    var = ctx(A).vars[1]
+
+    d = div(length(randpoints), 2)
+    l = length(vec[1])
+    res = Dict{M,OrePoly{eltype_co(A),M}}()
+    evs = Vector{elem_type(R)}(undef,length(vec))
+    for m in keys(vec[1])
+        ll = length(vec[1][m])
+        tmp = undefOrePoly(ll,A)
+        for i in 1:ll
+            for j in 1:length(vec)
+                evs[j] = R(coeff(vec[j][m],i))
+            end
+            num,den = cauchy_interpolation(ctx(A).R,var,evp,evs,d,prd = prd)
+            tmp[i] = (F(num) / F(den), mon(vec[1][m],i))
+        end
+        res[m] = tmp
+    end
+    return res 
+end
+
+# function cauchy_interpolation(vec :: Vector{Dict{M,OrePoly{T,M}}}, randpoints :: Vector{Int}, A :: OreAlg; prd ::fpPolyRingElem = Nothing) where {T,M}
+#     res = Dict{M,OrePoly{eltype_co(A),M}}()
+#     for m in keys(vec[1])
+#         tmp = [vec[i][m] for i in 1:length(randpoints)]
+#         res[m] = cauchy_interpolation(tmp, randpoints, A,prd = prd)
+#     end
+#     return res 
+# end
+
+
+
 function cauchy_interpolation(vec :: Vector{Tuple{Dict{M,OrePoly{T,M}}, OrePoly{T,M}}}, randpoints :: Vector{Int}, A :: OreAlg; prd ::Union{fpPolyRingElem,Nothing} = nothing) where {T,M}
     return cauchy_interpolation([vec[i][1] for i in 1:length(vec)], randpoints, A,prd = prd), cauchy_interpolation([vec[i][2] for i in 1:length(vec)], randpoints, A,prd = prd)
 end
+
 
 function cauchy_interpolation(vec :: Vector{OrePoly{T,M}}, randpoints :: Vector{Int},ind :: Int, A :: OreAlg) where {T<:Generic.FracFieldElem{fpMPolyRingElem},M}
     p = characteristic(parent(coeff(vec[1],1))).d

@@ -1,12 +1,14 @@
-struct F4Param{B,C,D} <: GBParam end 
+struct F4Param{A,B,C,D} <: GBParam end 
 
-f4_param(;stophol :: Val{B} = Val(false),
+f4_param(;geobucket :: Val{A} = Val(false), 
+         stophol :: Val{B} = Val(false),
          stat :: Val{C} = Val(false),
-         debug :: Val{D} = Val(false)) where {B,C,D} = F4Param{B,C,D}() 
+         debug :: Val{D} = Val(false)) where {A,B,C,D} = F4Param{A,B,C,D}() 
 
-stophol(:: F4Param{B,C,D}) where {B,C,D} = B 
-stat(:: F4Param{B,C,D}) where {B,C,D} = C 
-debug(::F4Param{B,C,D}) where {B,C,D} = D
+geobucket(:: F4Param{A,B,C,D}) where {A,B,C,D} = A 
+stophol(:: F4Param{A,B,C,D}) where {A,B,C,D} = B 
+stat(:: F4Param{A,B,C,D}) where {A,B,C,D} = C 
+debug(::F4Param{A,B,C,D}) where {A,B,C,D} = D
 
 
 
@@ -138,7 +140,11 @@ function saturate!(A::alg,
             red = basis[i]
             lmred = mon(red,1)
             if divide(lmred, m,A)
-                sred = shift(red, m,A,geob)
+                if geobucket(param)
+                    sred = shift(red, m,A,geob)
+                else 
+                    sred = shift(red, m,A)
+                end
                 if stat(param) 
                     globalstats.counters[:f4_nb_reducer_computed] += 1
                     globalstats.counters[:f4_size_reducer] += length(sred)
