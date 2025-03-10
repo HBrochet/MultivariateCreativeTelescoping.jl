@@ -85,7 +85,7 @@ end
 end
 
 @testset "Weyl closure and MCT" begin
-    A = OreAlg(order = "grevlex y > grevlex dx dy",ratdiffvars=(["x"],["dx"]),poldiffvars=(["y"],["dy"]),char = primes[1],varord = "dright")
+    A = OreAlg(order = "grevlex y > grevlex dx dy",ratdiffvars=(["x"],["dx"]),poldiffvars=(["y"],["dy"]))
     p = parse_OrePoly("x^2-y^3",A)
     gens = [parse_OrePoly("dx*(x^2-y^3)",A),parse_OrePoly("dy*(x^2-y^3)",A)]
     init = weyl_closure_init(A)

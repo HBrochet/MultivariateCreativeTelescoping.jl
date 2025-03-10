@@ -136,8 +136,7 @@ function saturate!(A::alg,
 
         # search for a reducer
         # TODO benchmark and improve
-        for i in length(basis):-1:1
-            red = basis[i]
+        for red in Iterators.reverse(basis)
             lmred = mon(red,1)
             if divide(lmred, m,A)
                 if geobucket(param)
@@ -193,7 +192,7 @@ function f4matrix(A::alg,
         # Among all possible pivots for a column, we choose the last
     pivots = zeros(Int, length(monomials))
     for (i, row) in enumerate(rows)
-        IdxMon(i) ∈ donotpivot && continue
+        #IdxMon(i) ∈ donotpivot && continue
         pivots[mon(row,1)] = i
     end
 
@@ -206,7 +205,6 @@ function f4matrix(A::alg,
                 mult = inv(lc, ctx(A))
                 newco = [mul(mult, c,ctx(A)) for c in row.coeffs]
                 rows[p] = OrePoly(newco,mons(row))
-                #todo optimiser
             end
         end
     end
@@ -241,7 +239,7 @@ function symbolicpp(A::alg,
     param ::F4Param,
     geob :: GeoBucket,
     interreduction::Bool=true,
-    spairrecution::Bool=false
+    spairrecution::Bool=false,
    ) where {alg <: OreAlg, K, M}
 
     isempty(pols) && error("nothing to preprocess")
@@ -253,9 +251,6 @@ function symbolicpp(A::alg,
     inputrows = BitSet()
     for (i, p) in enumerate(pols)
         if spairrecution
-            if stat(param)
-                globalstats.counters[:f4_nb_reducer_computed] += 1
-            end
             # in F4, we reduce together a bunch of half-S-pairs. In this case,
             # we do not need to search a reducer for leading terms, because it
             # is already reduced by the other half.
@@ -267,7 +262,7 @@ function symbolicpp(A::alg,
 
     saturate!(A, rows, basis, todo, done,param,geob)
 
-    return f4matrix(A, rows, done, interreduction ? BitSet() : inputrows, inputrows)
+    return f4matrix(A, rows, done, interreduction ? Set{M}() : inputrows, inputrows)
 end
 
 function interreductionmx(A :: OreAlg,
