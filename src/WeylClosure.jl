@@ -14,7 +14,7 @@ function wc_param(;method ::Val{F} = Val(:f5),
     if F == :f5 
         param =  F5Param{B,C,D,E}()
     elseif (F == :f4) || (F == :buchberger) 
-        param = F4Param{C,D,E}()
+        param = F4Param{B,C,D,E}()
     end
     return WCParam{typeof(param),F}(param,bound,morestep) 
 end
