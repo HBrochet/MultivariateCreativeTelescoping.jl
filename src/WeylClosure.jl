@@ -68,7 +68,8 @@ function saturation(g :: Vector{OrePoly{T,M}}, i :: Int, A :: OreAlg; param :: W
     push!(g, tmp)
     
 
-   
+    # println("init")
+    # prettyprint(g,A)
     if method(param) == :buchberger
         gb = Buchberger2(g,A,param = param.gb_param)
     elseif method(param) == :f4
@@ -76,8 +77,10 @@ function saturation(g :: Vector{OrePoly{T,M}}, i :: Int, A :: OreAlg; param :: W
     else
         gb = f5(g,A,param = param.gb_param)
     end
-    gb, lastpow = init_gb_sat(gb, bound,i,A)
 
+    gb, lastpow = init_gb_sat(gb, bound,i,A)
+    # println("gb")
+    # prettyprint(gb,A)
     res = filter(p -> mon(p,1)[i] == 0, gb) 
     debug(param) && @debug "gb initialized, it contains $(length(gb)) vectors"
     hol = isholonomic(res,A)
@@ -96,6 +99,12 @@ function saturation(g :: Vector{OrePoly{T,M}}, i :: Int, A :: OreAlg; param :: W
         end
         res = filter(p -> mon(p,1)[i] == 0, gb) 
         hol = isholonomic(res,A)
+        # println("last")
+        # prettyprint(gb,A)
+        # error("fin")
+        # if !hol 
+        #     error("fin")
+        # end
     end
     return res 
 end
@@ -118,7 +127,6 @@ function singular_locus(gens :: Vector{OrePoly{T,M}}, A :: OreAlg,init :: SingLo
     ngens = map_algebras(gens,A,nA)
     gb = f5(ngens,nA)
     clear_denominators!(gb,nA)
-
     pol = ctx(nA).R(1)
     for p in gb 
         pol = lcm(pol, numerator(coeff(p,1)))
@@ -145,7 +153,7 @@ function weyl_closure_internal(gens::Vector{OrePoly{T,M}}, A :: OreAlg, init :: 
     nA = init.A
     sl = singular_locus(gens,A,init.SLI)
     if sl == one(A)
-        return f5(gens,A,param = param.gb_param)
+        return f5(gens,A)
     else 
         nemo_p = prod(fact[1] for fact in factor_squarefree(sl) )
         p = OrePoly([nemo_p],[makemon(-1,A)])
