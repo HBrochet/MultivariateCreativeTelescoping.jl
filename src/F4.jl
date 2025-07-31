@@ -270,6 +270,10 @@ function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param(
     return basis
 end
 
+function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg, param :: F4Param) where {K,M,Alg <: OreAlg}
+    return f4(gens,A,param=param)
+end
+
 function f4_mri(A :: OreAlg,gen :: Vector{OrePoly{K,M}}, param :: F4Param) where {K,M}
     # flatten the result to allow rational reconstruction with mri 
     tmp =  f4(gen,A,param = param)
