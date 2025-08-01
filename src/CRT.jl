@@ -1,10 +1,13 @@
-struct CRTParam{A} end 
+struct CRTParam{A,B} end 
 
-function crt_param(;tracer :: Val{A} = Val(false)) where {A}
-    return CRTParam{A}()
+function crt_param(;tracer :: Val{A} = Val(false),
+                    comp :: Val{B} = Val(:medium)
+                    ) where {A,B}
+    return CRTParam{A,B}()
 end
 
-tracer(p :: CRTParam{A}) where {A} = A 
+tracer(p :: CRTParam{A,B}) where {A,B} = A 
+comp(p :: CRTParam{A,B}) where {A,B} = B
 
 
 function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam = crt_param())
@@ -13,6 +16,7 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam =
     primes_ = [primes[1]]
     prime = primes[1]
     bound = 1
+    bnd = 1
     succeeded = false # after reconstructing the result we try one more prime 
 
     if ctx(A) isa RatFunCtx
@@ -46,7 +50,7 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam =
                 @debug "reconstructions are not consistent, trying more primes"
                 prev_res = res
             end
-        elseif nprime == bound^2
+        elseif nprime == bnd
             @debug "trying to reconstruct result via CRT"
             try
                 prev_res = crt(res_modp, primes_, A)
@@ -55,7 +59,15 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam =
                 @debug "success, trying one more prime"
             catch
                 @debug "failed trying more primes"
-                bound += 1 
+                if comp(param) == :fast 
+                    bnd = 2^bound + 1
+                elseif comp(param) == :medium 
+                    bnd = bound^2 + 1
+                else # comp(param) = :slow 
+                    bnd = bound + 1
+                end 
+                bound += 1
+
             end
         end
         # if nprime == 5
