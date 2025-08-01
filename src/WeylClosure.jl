@@ -155,7 +155,6 @@ function weyl_closure_internal(gens::Vector{OrePoly{T,M}}, A :: OreAlg, init :: 
     if sl == one(A)
         return f5(gens,A)
     else 
-        println(sl)
         nemo_p = prod(fact[1] for fact in factor_squarefree(sl) )
         p = OrePoly([nemo_p],[makemon(-1,A)])
     end
