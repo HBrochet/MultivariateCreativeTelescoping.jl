@@ -13,7 +13,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 Combinatorics = "1"
-DataStructures = "0.18"
+DataStructures = "0.18, 0.19"
 ExportAll = "0.1"
 Nemo = "0.49"
 StaticArrays = "1"
