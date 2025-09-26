@@ -1,3 +1,5 @@
+const _d = 4 # the size of buckets in the geobucket grows as _d^i 
+
 struct GeoBucket{K, M <: AbsOreMonomial} <: AbsOrePolynomial{K, M}
     tab1 :: Vector{OrePoly{K,M}}
     tab2 :: Vector{OrePoly{K,M}}
@@ -5,17 +7,17 @@ struct GeoBucket{K, M <: AbsOreMonomial} <: AbsOrePolynomial{K, M}
     indices :: Vector{Int} # index of the lm in the ith active tab 
 end
 
-# following Yan's paper we create an array tab s.t length(tab[i]) <= 4*4^i 
-# that store a polynomial of size at most 4^i
-# It is stored in the first 4^i indices if indices[i] <= 4^i and between the indices 2*4^i +1:end 
+# following Yan's paper we create an array tab s.t length(tab[i]) <= 4*_d^i 
+# that store a polynomial of size at most _d^i
+# It is stored in the first _d^i indices if indices[i] <= _d^i and between the indices 2*_d^i +1:end 
 # otherwise. The remaining memory is preallocated for addition of polynomials 
 # !!! Monomials are stored in increasing order in GeoBuckets
 
 function GeoBucket(p :: OrePoly{K,M}) where {K, M<: AbsOreMonomial}
     lenp = length(p)
-    l = int_log_upper(4,lenp)
-    tab1 = [OrePoly(Vector{K}(undef,2*4^i),Vector{M}(undef,2*4^i)) for i in 1:l]
-    tab2 = [OrePoly(Vector{K}(undef,2*4^i),Vector{M}(undef,2*4^i)) for i in 1:l]
+    l = int_log_upper(_d,lenp)
+    tab1 = [OrePoly(Vector{K}(undef,2*_d^i),Vector{M}(undef,2*_d^i)) for i in 1:l]
+    tab2 = [OrePoly(Vector{K}(undef,2*_d^i),Vector{M}(undef,2*_d^i)) for i in 1:l]
     active_tab_is_1 = [true for j in 1:l]
     indices = [0 for j in 1:l]
     for j in 1:lenp
@@ -27,7 +29,7 @@ end
 
 function init_GeoBucket!(g :: GeoBucket, p :: OrePoly)
     lenp = length(p)
-    l = int_log_upper(4,lenp)
+    l = int_log_upper(_d,lenp)
     if l > length(g) 
         grow_to!(g,l)
     end
@@ -86,8 +88,8 @@ function change_active_tab!(g :: GeoBucket,j :: Int)
 end
 
 function grow_to!(g :: GeoBucket{K,M}, l ::Int) where {K,M}
-    append!(g.tab1,[OrePoly(Vector{K}(undef,2*4^j),Vector{M}(undef,2*4^j)) for j in length(g.tab1)+1:l])
-    append!(g.tab2,[OrePoly(Vector{K}(undef,2*4^j),Vector{M}(undef,2*4^j)) for j in length(g.tab2)+1:l])
+    append!(g.tab1,[OrePoly(Vector{K}(undef,2*_d^j),Vector{M}(undef,2*_d^j)) for j in length(g.tab1)+1:l])
+    append!(g.tab2,[OrePoly(Vector{K}(undef,2*_d^j),Vector{M}(undef,2*_d^j)) for j in length(g.tab2)+1:l])
     append!(g.active_tab_is_1,[true for j in length(g.active_tab_is_1)+1:l])
     append!(g.indices,[0 for j in length(g.indices)+1:l])
     nothing
@@ -268,7 +270,7 @@ function add_to_slice_j!(g :: GeoBucket,i :: Int, j :: Int, A :: OreAlg)
     g.indices[j] = w - 1
 
     change_active_tab!(g,j)
-    if w > 4^j + 1 
+    if w > _d^j + 1 
         add_to_slice_j!(g,i+1,i+2,A)
     end
 
@@ -276,7 +278,7 @@ function add_to_slice_j!(g :: GeoBucket,i :: Int, j :: Int, A :: OreAlg)
 end
 
 function add!(g :: GeoBucket,co ::T, p :: OrePoly,A :: OreAlg) where T
-    j =  int_log_upper(4,length(p))
+    j =  int_log_upper(_d,length(p))
     if j > length(g)
         grow_to!(g,j)
     end
@@ -327,7 +329,7 @@ function add!(g :: GeoBucket,co ::T, p :: OrePoly,A :: OreAlg) where T
     end
     g.indices[j] = w - 1
     change_active_tab!(g,j)
-    if w > 4^j + 1 
+    if w > _d^j + 1 
         add_to_slice_j!(g,j,j+1,A)
     end
     return g
@@ -427,7 +429,7 @@ end
 function addmul_geobucket_dright!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg ) where {K,M}
     for (l,mm) in enumerate(itr_mon_dright(m.exp,A.nrdv,A.npdv)) 
         siz = guess_size_dright(mm,m,f,A)
-        i =  int_log_upper(4,siz)
+        i =  int_log_upper(_d,siz)
         if i > length(g)
             grow_to!(g,i)
         end
@@ -481,7 +483,7 @@ function addmul_geobucket_dright!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A
 
         g.indices[i] = w-1
         change_active_tab!(g,i)
-        if w > 4^i + 1
+        if w > _d^i + 1
             add_to_slice_j!(g,i,i+1,A)
         end
     end
@@ -574,7 +576,7 @@ end
 function addmul_geobucket_dleft!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg; mod_der :: Val{B} = Val(false)) where {K,M,B}
     for (l,mm) in enumerate(itr_mon_dleft(m.exp,A.nrdv,A.npdv)) 
         siz = guess_size_dleft(mm,m,f,A)
-        i =  int_log_upper(4,siz)
+        i =  int_log_upper(_d,siz)
         if i > length(g)
             grow_to!(g,i)
         end
@@ -629,7 +631,7 @@ function addmul_geobucket_dleft!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:
         change_active_tab!(g,i)
         B && mod_derivatives!(g,i,A)
         w = g.indices[i]
-        if w > 4^i
+        if w > _d^i
             add_to_slice_j!(g,i,i+1,A)
         end
     end

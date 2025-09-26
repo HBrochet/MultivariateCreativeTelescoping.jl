@@ -1,9 +1,10 @@
 struct Statistics
     timings :: Dict{Symbol, Float64}
     counters :: Dict{Symbol, Int}
+    reducers :: Dict{Symbol,Int}
 end
 
-const globalstats = Statistics(Dict(), Dict())
+const globalstats = Statistics(Dict(), Dict(),Dict())
 
 function initglobalstats!()
     for p in []
@@ -20,6 +21,8 @@ function initglobalstats!()
               :mri_nb_points]
         push!(globalstats.counters, p => 0)
     end
+
+    empty!(globalstats.reducers)
 end
 
 initglobalstats!()
