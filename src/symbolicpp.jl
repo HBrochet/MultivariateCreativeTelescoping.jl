@@ -1,15 +1,16 @@
-struct F4Param{A,B,C,D} <: GBParam end 
+struct F4Param{A,B,C,D,E} <: GBParam end 
 
 f4_param(;geobucket :: Val{A} = Val(false), 
          stophol :: Val{B} = Val(false),
          stat :: Val{C} = Val(false),
-         debug :: Val{D} = Val(false)) where {A,B,C,D} = F4Param{A,B,C,D}() 
+         debug :: Val{D} = Val(false),
+         select_reducer :: Val{E} = Val(:last)) where {A,B,C,D,E} = F4Param{A,B,C,D,E}() 
 
-geobucket(:: F4Param{A,B,C,D}) where {A,B,C,D} = A 
-stophol(:: F4Param{A,B,C,D}) where {A,B,C,D} = B 
-stat(:: F4Param{A,B,C,D}) where {A,B,C,D} = C 
-debug(::F4Param{A,B,C,D}) where {A,B,C,D} = D
-
+geobucket(:: F4Param{A,B,C,D,E}) where {A,B,C,D,E} = A 
+stophol(:: F4Param{A,B,C,D,E}) where {A,B,C,D,E} = B 
+stat(:: F4Param{A,B,C,D,E}) where {A,B,C,D,E} = C 
+debug(::F4Param{A,B,C,D,E}) where {A,B,C,D,E} = D
+select_reducer(::F4Param{A,B,C,D,E}) where {A,B,C,D,E} = E
 
 
 # Building upon AbsOreMonomial define monomials indexed by integers
@@ -116,9 +117,53 @@ end
 
 
 
-#For each monomial in `todo`, find a reducer in `basis` and add it to `rows` with `pushrow!`
+# For each monomial in `todo`, find a reducer in `basis` and add it to `rows` with `pushrow!`
 
 function saturate!(A::alg,
+                   rows::Vector{OrePoly{K,M}},
+                   basis::Vector{OrePoly{K,M}},
+                   todo::Set{M}, done::Set{M},
+                   param ::F4Param,
+                   geob :: GeoBucket) where {K,M, alg <: OreAlg}
+
+    # recursively find all possible reducers
+
+    while !isempty(todo)
+        m = pop!(todo)
+        m ∈ done && continue
+        push!(done, m)
+
+        # search for a reducer
+
+        i = select_reducer(A,basis,m,Val(select_reducer(param)))
+        println(i)
+        if i == 0 # no reducer found
+            continue 
+        end
+        red = basis[i]
+        if geobucket(param)
+            sred = shift(red, m,A,geob)
+        else 
+            sred = shift(red, m,A)
+        end
+        if stat(param) 
+            lmred = mon(red,1)
+            globalstats.counters[:f4_nb_reducer_computed] += 1
+            globalstats.counters[:f4_size_reducer] += length(sred)
+            globalstats.counters[:f4_size_m]+= sum(m/lmred)
+            globalstats.counters[:f4_deg_reducer] += maxdeg(sred)
+            add_reducer_globalstats!(i, m/lmred)
+        end
+
+        pushrow!(A, rows, sred, todo, done)
+    end
+
+    return
+end
+
+
+
+function saturate2!(A::alg,
                    rows::Vector{OrePoly{K,M}},
                    basis::Vector{OrePoly{K,M}},
                    todo::Set{M}, done::Set{M},
@@ -140,6 +185,7 @@ function saturate!(A::alg,
             red = basis[i]
             lmred = mon(red,1)
             if divide(lmred, m,A)
+                @assert select_reducer(A,basis,m,Val(select_reducer(param))) == i 
                 if geobucket(param)
                     sred = shift(red, m,A,geob)
                 else 
@@ -162,7 +208,72 @@ function saturate!(A::alg,
     return
 end
 
+function select_reducer(A :: OreAlg,
+               basis :: Vector{OrePoly{K,M}},
+               m :: OreMonVE,
+               :: Val{E}) where {K,M,E}
+    we= 2^31
+    j = 0 
+    for i in 1:length(basis)
+        if divide(mon(basis[i],1),m,A) 
+            w = weight(basis[i],Val(E))
+            if w <= we
+                j = i 
+                we = w 
+            end
+        end
+    end
+    return j
+end
 
+function weight(g :: OrePoly, ::Val{:last}) 
+    return 2^31
+end
+
+function weight(g :: OrePoly, :: Val{:shortest})
+    return length(g)
+end
+
+function weight(g :: OrePoly, :: Val{:elim})
+    w = 0 
+    d = sum(mon(g,1)) 
+    for m in mons(g) 
+        s = sum(m)
+        if d > s 
+            w += 1 + d -s 
+        else 
+            w +=1
+        end
+    end
+    return w 
+end
+
+function weight(g :: OrePoly, :: Val{:elim_coeffsize})
+    w = 0 
+    d = sum(mon(g,1)) 
+    for (c,m) in g 
+        s = sum(m)
+        if d > s 
+            w += weight(c)*(1 + d -s) 
+        else 
+            w += weight(c)
+        end
+    end
+    return w 
+end
+
+function weight(g :: OrePoly, :: Val{:coeffsize})
+    return sum(weight(c) for c in coeffs(g))
+end
+weight(c :: UInt32) = 32 
+weight(c :: UnivRatFunModp) = 32*length(c)
+weight(c :: UnivRatFunQQ) = weight(numerator(c)) + weight(denominator(c))
+weight(c :: RatFunModp) = 32*length(c)
+weight(c :: RatFunQQ) = weight(numerator(c)) + weight(denominator(c))
+weight(c :: ZZMPolyRingElem) = sum(weight(cc) for cc in coefficients(c))
+weight(c :: ZZPolyRingElem) = sum(weight(cc) for cc in coeffs(c))
+weight(c :: ZZRingElem) = ceil(Int,log2(c))
+weight(c :: QQFieldElem) = weight(numerator(c)) + weight(denominator(c))
 
 
 
@@ -203,9 +314,10 @@ function f4matrix(A::alg,
             lc = coeff(row, 1)
             if !isone(lc,ctx(A))
                 # normalize if required
-                mult = inv(lc, ctx(A))
-                newco = [mul(mult, c,ctx(A)) for c in row.coeffs]
-                rows[p] = OrePoly(newco,mons(row))
+                makemonic!(row,A)
+                # mult = inv(lc, ctx(A))
+                # newco = [mul(mult, c,ctx(A)) for c in row.coeffs]
+                # rows[p] = OrePoly(newco,mons(row))
                 #todo optimiser
             end
         end
@@ -265,8 +377,17 @@ function symbolicpp(A::alg,
         push!(inputrows, length(rows))
     end
 
-    saturate!(A, rows, basis, todo, done,param,geob)
+    # rows2 = deepcopy(rows)
+    # todo2 = deepcopy(todo)
+    # done2 = deepcopy(done)
 
+    saturate!(A, rows, basis, todo, done,param,geob)
+    # saturate2!(A, rows2, basis, todo2, done2,param,geob)
+    # prettyprint(rows,A)
+    # prettyprint(rows2,A)
+    # @assert todo == todo2 
+    # @assert rows == rows2 
+    # @assert done == done2
     return f4matrix(A, rows, done, interreduction ? BitSet() : inputrows, inputrows)
 end
 
@@ -295,7 +416,22 @@ function interreductionmx(A :: OreAlg,
     for (i, p) in enumerate(basis)
         pushrow!(A, rows, p, todo, done)
         push!(inputrows, length(rows))
+
+        # rows2 = deepcopy(rows)
+        # todo2 = deepcopy(todo)
+        # done2 = deepcopy(done)
+
+
         saturate!(A, rows, currentbasis, todo, done,param,geob)
+        # saturate2!(A, rows2, currentbasis, todo2, done2,param,geob)
+
+        # prettyprint(rows,A)
+        # prettyprint(rows2,A)
+        # println(length(todo))
+        # println(length(todo2))
+        # @assert todo == todo2 
+        # @assert rows == rows2 
+        # @assert done == done2
         push!(currentbasis, p)
     end
 
