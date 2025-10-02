@@ -136,7 +136,6 @@ function saturate!(A::alg,
         # search for a reducer
 
         i = select_reducer(A,basis,m,Val(select_reducer(param)))
-        println(i)
         if i == 0 # no reducer found
             continue 
         end
@@ -267,13 +266,13 @@ function weight(g :: OrePoly, :: Val{:coeffsize})
 end
 weight(c :: UInt32) = 32 
 weight(c :: UnivRatFunModp) = 32*length(c)
-weight(c :: UnivRatFunQQ) = weight(numerator(c)) + weight(denominator(c))
+weight(c :: UnivRatFunQQ) = weight(numerator(c)) + weight(Nemo.denominator(c))
 weight(c :: RatFunModp) = 32*length(c)
-weight(c :: RatFunQQ) = weight(numerator(c)) + weight(denominator(c))
+weight(c :: RatFunQQ) = weight(numerator(c)) + weight(Nemo.denominator(c))
 weight(c :: ZZMPolyRingElem) = sum(weight(cc) for cc in coefficients(c))
 weight(c :: ZZPolyRingElem) = sum(weight(cc) for cc in coeffs(c))
-weight(c :: ZZRingElem) = ceil(Int,log2(c))
-weight(c :: QQFieldElem) = weight(numerator(c)) + weight(denominator(c))
+weight(c :: ZZRingElem) = ceil(Int,log2(abs(c)))
+weight(c :: QQFieldElem) = weight(numerator(c)) + weight(Nemo.denominator(c))
 
 
 
