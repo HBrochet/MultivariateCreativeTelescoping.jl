@@ -248,22 +248,24 @@ function weight(g :: OrePoly, :: Val{:elim})
 end
 
 function weight(g :: OrePoly, :: Val{:elim_coeffsize})
-    w = 0 
+    w = 0
     d = sum(mon(g,1)) 
-    for (c,m) in g 
+    for m in mons(g) 
         s = sum(m)
         if d > s 
-            w += weight(c)*(1 + d -s) 
+            w += 1 + d -s 
         else 
-            w += weight(c)
+            w += 1
         end
     end
-    return w 
+    return w*weight(denominator(g)) 
 end
 
 function weight(g :: OrePoly, :: Val{:coeffsize})
-    return sum(weight(c) for c in coeffs(g))
+    return weight(denominator(g)) 
 end
+
+
 weight(c :: UInt32) = 32 
 weight(c :: UnivRatFunModp) = 32*length(c)
 weight(c :: UnivRatFunQQ) = weight(numerator(c)) + weight(Nemo.denominator(c))
