@@ -25,9 +25,9 @@ const NmodF4Matrix{I, T, Tbuf} = F4Matrix{M,I,T,Alg} where {T,Tbuf,C <: AbsConte
         l += 4
     end
 
-    @inbounds for l in l:length(red)
-        m = mon(red, l)
-        c = coeff(red, l)
+    @inbounds for k in l:length(red)
+        m = mon(red, k)
+        c = coeff(red, k)
         buffer[m] = submul(buffer[m], mult, c, ctx)
     end
 end
@@ -101,8 +101,6 @@ function elementary_reduction_in_buffer(mx::NmodF4Matrix{I, T, Tbuf},
     mult = deflate(buffer[j],ctx(mx.A))
     buffer[j] = zero(T,ctx(mx.A))
     # Critical loop
-    # globalstats.timings[:critical_loop] +=
-    #     @elapsed 
     criticalloop!(ctx(mx.A), buffer, reducer, mult)
     return true
 end
@@ -112,8 +110,10 @@ function reduce!(mx::NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, 
 
     buffer = Vector{Tbuf}(undef, mx.nbcolumns)
     # iter = 0 
-    for (i, row) in enumerate(mx.rows)
-        if isempty(row) || ispivot(mx, i)
+    for i in mx.inputrows
+        row = mx.rows[i]
+        # @assert !ispivot(mx,i)
+        if isempty(row) || ispivot(mx,i)
             continue
         end
 
@@ -127,23 +127,19 @@ function reduce!(mx::NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, 
                 break
             end
         end
-
-        # Do it as savebuffer! expects it
-        for j in leadingterm+1:mx.nbcolumns
-            buffer[j] = normal(buffer[j], ctx(mx.A))
-        end
-
-        if leadingterm > 0
-            # nonzero reduction
-            if !(i ∈ mx.donotpivot)  # && mx.εcolumn > leadingterm
-                # new pivot
-                mx.rows[i] = savebuffer!(ctx(mx.A), buffer, row, leadingterm, true)
-                mx.pivots[leadingterm] = i
-                push!(mx.newpivots, i)       
-            else
-                mx.rows[i] = savebuffer!(ctx(mx.A), buffer, row, leadingterm, false)      
+        
+        # if row is a new pivot, reduce its tail and add it to the pivot list
+        if leadingterm > 0 
+            
+            for k in leadingterm+1:mx.nbcolumns
+                elementary_reduction_in_buffer(mx, buffer, k,param)
             end
+            # new pivot
+            mx.rows[i] = savebuffer!(ctx(mx.A), buffer, row, leadingterm, true)
+            mx.pivots[leadingterm] = i
+            push!(mx.newpivots, i)       
         else
+            # otherwise the row is zero
             mx.rows[i] = OrePoly(T[],I[])
         end
     end
@@ -192,7 +188,7 @@ function reducepivots!(mx :: NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T
 end
 
 function reducenewpivots!(mx :: NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, I}
-
+    #todo: relire cette partie
     buffer = Vector{Tbuf}(undef, mx.nbcolumns)
 
     piv = [mon(mx.rows[p],1) for p in mx.newpivots]
@@ -217,29 +213,20 @@ end
 function interreduce(alg :: OreAlg,
                       pols :: Vector{OrePoly{I, T}},
                       param :: F4Param,
-                      geob :: GeoBucket,
-                      fullreduction :: Bool = true
+                      geob :: GeoBucket
                       ) where {I, T}
 
-    isempty(pols) && return pols
-    for p in pols
-        if length(p) == 0 
-            error("zero vector in basis in interreduce")
-        end
-    end
-
     mx = interreductionmx(alg, pols,param,geob)
-    if fullreduction
-        reducepivots!(mx,param)
-        reduce_full_known_pivots!(mx,param)
-    else 
-        reduce!(mx,param)
-    end
 
+    # interreduce the pivots, then reduce the input operators  
+    # todo: should we use the new pivots once again ? 
+
+    reducepivots!(mx,param)  
+    reduce!(mx,param)
 
     # It is important here that a polynomial in `pols` is not chosen as pivots
     # if its leading term is reducible.
-    # prettyprint(mx.rows,alg)
+    
     pols = [row(mx, i) for i in mx.inputrows]
 
     filter!(p -> !isempty(p), pols)

@@ -61,9 +61,6 @@ mutable struct F4Matrix{M,I,T,alg <: OreAlg}
     monomialtoidx::Dict{M,I}
 
     nbcolumns::Int
-    # εcolumn::I           # first column corresponding to an ε term. beyond this
-    #                      # column, we only carry the information but mostly
-    #                      # ignore it.
 
     rows::Vector{OrePoly{T, I}} # sparse rows
 
@@ -103,12 +100,21 @@ function pushrow!(A::alg,
     for k in 1:length(p)
         m = mon(p, k)
         if !(m ∈ done)
-            # if isepsilon(ctx.mo, m)
-            #     # we don't look for reducers for ε terms
-            #     push!(done, m)
-            # else
-                push!(todo, m)
-            # end
+            push!(todo, m)
+        end
+    end
+end
+
+function pushrow_delayed!(A::alg,
+                  p::OrePoly{K,M},
+                  todo::Set{M},
+                  done::Set{M},
+                  ) where {K,M, alg <: OreAlg}
+
+    for k in 1:length(p)
+        m = mon(p, k)
+        if !(m ∈ done)
+            push!(todo, m)
         end
     end
 end
@@ -239,7 +245,7 @@ function weight(g :: OrePoly, :: Val{:elim})
     for m in mons(g) 
         s = sum(m)
         if d > s 
-            w += 1 + d -s 
+            w += d - s 
         else 
             w +=1
         end
@@ -253,7 +259,7 @@ function weight(g :: OrePoly, :: Val{:elim_coeffsize})
     for m in mons(g) 
         s = sum(m)
         if d > s 
-            w += 1 + d -s 
+            w += d -s 
         else 
             w += 1
         end
@@ -277,18 +283,35 @@ weight(c :: ZZRingElem) = ceil(Int,log2(abs(c)))
 weight(c :: QQFieldElem) = weight(numerator(c)) + weight(Nemo.denominator(c))
 
 
+function div2!(f :: OrePoly, g :: Vector{OrePoly{K,M}} ,A :: OreAlg; full :: Val{B} = Val(true),param :: GBParam = DefaultParam()) where {K,M,B}
+    r=1 
+    while r <= length(f) 
+        m = mon(f,r)
+        i = select_reducer(A,g,m,Val(:shortest))
+        if i > 0 
+            f = reduce!(f,r, g[i], A,param = param)
+        else 
+            r = r + 1
+        end
+    end
+    return f
+end
 
-#Construct the matrix from a list of sparse row.
-#Concretely, it computes the column indices, reindex all rows so that the
-#index is now the column index, not the index in the monomial table; it finds
-#the pivots and normalize them if required.
+
+
+
+# Construct the matrix from a list of sparse row.
+# Concretely, it computes the column indices, reindex all rows so that monomials
+# are replaced by its associated column index; it finds
+# the pivots and normalize them if required.
 
 function f4matrix(A::alg,
                   rows_::Vector{OrePoly{K,M}},
                   monomialset::Set{M}, donotpivot::BitSet,
-                  inputrows::BitSet
+                  inputrows::BitSet, newpivots :: BitSet
                   ) where {K,M, alg <: OreAlg}
 
+    # sorts monomials and create a bijection with a finite subset of the integers
     monomials = collect(M, monomialset)
     sort!(monomials, order=order(A), rev=true)
 
@@ -297,39 +320,39 @@ function f4matrix(A::alg,
         monomialtoidx[m] = IdxMon(i)
     end
 
-    # Better to do it in place?
+    # replace monomials by their associated column index
     rows = Vector{OrePoly{K,IdxMon}}(undef,length(rows_))
     for i in 1:length(rows_)
         rows[i] = monomialsubs(rows_[i], monomialtoidx)
     end 
-        # Among all possible pivots for a column, we choose the last
+
+    # Among all possible pivots for a column, we choose the last, except for newpivots who take priority
+    
     pivots = zeros(Int, length(monomials))
     for (i, row) in enumerate(rows)
         IdxMon(i) ∈ donotpivot && continue
         pivots[mon(row,1)] = i
     end
+    for i in newpivots
+        row = rows[i] 
+        pivots[mon(row,1)] = i 
+    end
 
+    # normalize pivots
     for p in pivots
         if p != 0
             row = rows[p]
             lc = coeff(row, 1)
             if !isone(lc,ctx(A))
-                # normalize if required
                 makemonic!(row,A)
-                # mult = inv(lc, ctx(A))
-                # newco = [mul(mult, c,ctx(A)) for c in row.coeffs]
-                # rows[p] = OrePoly(newco,mons(row))
-                #todo optimiser
             end
         end
     end
 
-    # εcolumn = findlast(m -> !isepsilon(ctx.mo, m), monomials) + 1
-
     f4matrix = F4Matrix{M, IdxMon,eltype_co(A), typeof(A)}(
         A, monomials, monomialtoidx,
         length(monomials), rows, pivots,
-        donotpivot, BitSet(), inputrows)
+        donotpivot, newpivots, inputrows)
 
 end
 
@@ -364,6 +387,7 @@ function symbolicpp(A::alg,
     todo = Set{M}()
     done = Set{M}()
     inputrows = BitSet()
+    newpivots = BitSet()
     for (i, p) in enumerate(pols)
         if spairrecution
             if stat(param)
@@ -373,23 +397,21 @@ function symbolicpp(A::alg,
             # we do not need to search a reducer for leading terms, because it
             # is already reduced by the other half.
             push!(done, mon(p,1))
+        else 
+            # otherwise the spair could be a new pivot
+            m = mon(p,1)
+            if !any(divide(mon(g,1),m,A) for g in basis) && !any(divide(mon(g,1),m,A) for g in rows)
+                push!(done, m)
+                push!(newpivots,length(rows)+1)
+            end
+            pushrow!(A, rows, p, todo, done)
         end
-        pushrow!(A, rows, p, todo, done)
         push!(inputrows, length(rows))
     end
 
-    # rows2 = deepcopy(rows)
-    # todo2 = deepcopy(todo)
-    # done2 = deepcopy(done)
-
     saturate!(A, rows, basis, todo, done,param,geob)
-    # saturate2!(A, rows2, basis, todo2, done2,param,geob)
-    # prettyprint(rows,A)
-    # prettyprint(rows2,A)
-    # @assert todo == todo2 
-    # @assert rows == rows2 
-    # @assert done == done2
-    return f4matrix(A, rows, done, interreduction ? BitSet() : inputrows, inputrows)
+
+    return f4matrix(A, rows, done, interreduction ? BitSet() : inputrows, inputrows, newpivots)
 end
 
 function interreductionmx(A :: OreAlg,
@@ -399,14 +421,9 @@ function interreductionmx(A :: OreAlg,
                           ) where {I, T}
 
 
-    # increasing order of leading monomial
-
+    # sort by increasing order of leading monomials
     basis = sort(basis, order=order(A))
-    for p in basis 
-        if length(p) == 0 
-            error("zero vector in basis")
-        end
-    end
+
     rows = OrePoly{I, T}[]
     currentbasis = eltype(basis)[]
 
@@ -414,29 +431,14 @@ function interreductionmx(A :: OreAlg,
     done = Set{T}()
     inputrows = BitSet()
 
-    for (i, p) in enumerate(basis)
+    for p in basis
         pushrow!(A, rows, p, todo, done)
         push!(inputrows, length(rows))
-
-        # rows2 = deepcopy(rows)
-        # todo2 = deepcopy(todo)
-        # done2 = deepcopy(done)
-
-
         saturate!(A, rows, currentbasis, todo, done,param,geob)
-        # saturate2!(A, rows2, currentbasis, todo2, done2,param,geob)
-
-        # prettyprint(rows,A)
-        # prettyprint(rows2,A)
-        # println(length(todo))
-        # println(length(todo2))
-        # @assert todo == todo2 
-        # @assert rows == rows2 
-        # @assert done == done2
         push!(currentbasis, p)
     end
 
-    return f4matrix(A, rows, done, BitSet(), inputrows)
+    return f4matrix(A, rows, done, BitSet(), inputrows, BitSet())
 end
 
 
