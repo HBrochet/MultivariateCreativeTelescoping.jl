@@ -341,6 +341,11 @@ function denominator(p :: OrePoly,A:: OreAlg)
     return lcm([Nemo.denominator(c,false) for c in coeffs(p)])
 end
 
+function denominator(p :: OrePoly)
+    # it assumes lengtp(p) > 0
+    return lcm([Nemo.denominator(c,false) for c in coeffs(p)])
+end
+
 function clear_denominators!(p :: OrePoly, A :: OreAlg)
     if ctx(A) isa RatFunCtx
         den = ctx(A).F(denominator(p, A))

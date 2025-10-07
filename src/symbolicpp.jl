@@ -1,16 +1,21 @@
-struct F4Param{A,B,C,D,E} <: GBParam end 
+struct F4Param{A,B,C,D,E,F} <: GBParam end 
 
 f4_param(;geobucket :: Val{A} = Val(false), 
          stophol :: Val{B} = Val(false),
          stat :: Val{C} = Val(false),
          debug :: Val{D} = Val(false),
-         select_reducer :: Val{E} = Val(:last)) where {A,B,C,D,E} = F4Param{A,B,C,D,E}() 
+         select_reducer :: Val{E} = Val(:last),
+         tracer :: Val{F} = Val(:none)) where {A,B,C,D,E,F} = F4Param{A,B,C,D,E,F}() 
 
-geobucket(:: F4Param{A,B,C,D,E}) where {A,B,C,D,E} = A 
-stophol(:: F4Param{A,B,C,D,E}) where {A,B,C,D,E} = B 
-stat(:: F4Param{A,B,C,D,E}) where {A,B,C,D,E} = C 
-debug(::F4Param{A,B,C,D,E}) where {A,B,C,D,E} = D
-select_reducer(::F4Param{A,B,C,D,E}) where {A,B,C,D,E} = E
+geobucket(:: F4Param{A,B,C,D,E,F}) where {A,B,C,D,E,F} = A 
+stophol(:: F4Param{A,B,C,D,E,F}) where {A,B,C,D,E,F} = B 
+stat(:: F4Param{A,B,C,D,E,F}) where {A,B,C,D,E,F} = C 
+debug(::F4Param{A,B,C,D,E,F}) where {A,B,C,D,E,F} = D
+select_reducer(::F4Param{A,B,C,D,E,F}) where {A,B,C,D,E,F} = E
+# the two functions below check whether a tracer is used
+learn(::F4Param{A,B,C,D,E,F}) where {A,B,C,D,E,F} = F == :learn
+apply(::F4Param{A,B,C,D,E,F}) where {A,B,C,D,E,F} = F == :apply
+
 
 
 # Building upon AbsOreMonomial define monomials indexed by integers
