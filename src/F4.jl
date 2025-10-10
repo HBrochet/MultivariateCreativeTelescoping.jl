@@ -397,9 +397,19 @@ function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param(
     end
 end
 
-function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg, param :: F4Param) where {K,M,Alg <: OreAlg}
-    return f4(gens,A,param=param)
+# wrapper for using crt with tracer = Val(:apply) 
+function f4(trace ::F4Trace, gens :: Vector{OrePoly{K,M}}, A :: Alg, param :: F4Param) where {K,M,Alg <: OreAlg}
+    par = f4param_learn_to_apply(param)
+    return f4(gens,A, param= par, trace = trace)
 end
+# wrapper for using crt with tracer = Val(:learn) 
+
+function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg,param :: F4Param; tracer :: Val{B} = Val(false)) where {B,K,M,Alg <: OreAlg}
+    B && @assert learn(param) # for compatibility with compute_with_crt
+    return f4(gens,A, param= param)
+end
+
+
 
 function f4_mri(A :: OreAlg,gen :: Vector{OrePoly{K,M}}, param :: F4Param) where {K,M}
     # flatten the result to allow rational reconstruction with mri 

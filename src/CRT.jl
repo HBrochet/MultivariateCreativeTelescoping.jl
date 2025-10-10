@@ -10,6 +10,10 @@ tracer(p :: CRTParam{A,B}) where {A,B} = A
 comp(p :: CRTParam{A,B}) where {A,B} = B
 
 
+
+# the tracer assume f can be called with f(...;tracer=Val(true)) to learn and return a trace  
+# and f(trace,...) to apply the trace at subsequent computations
+
 function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam = crt_param())
     nprime = 1
     globalstats.counters[:number_primes] += 1
@@ -36,7 +40,6 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam =
         else 
             res_modp = [f(change_coefficient_field(nA, args...)...)]
         end
-        res_modp = [f(change_coefficient_field(nA,args...)...)]
     end
     let prev_res
     while true 
@@ -70,7 +73,7 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam =
 
             end
         end
-        # if nprime == 5
+        # if nprime == 100
         #     # for i in 1:5 
         #     #     prettyprint(res_modp[i],A)
         #     # end

@@ -15,7 +15,7 @@ select_reducer(::F4Param{A,B,C,D,E,F}) where {A,B,C,D,E,F} = E
 # the two functions below check whether a tracer is used
 learn(::F4Param{A,B,C,D,E,F}) where {A,B,C,D,E,F} = F == :learn
 apply(::F4Param{A,B,C,D,E,F}) where {A,B,C,D,E,F} = F == :apply
-
+f4param_learn_to_apply(::F4Param{A,B,C,D,E,:learn}) where {A,B,C,D,E} = F4Param{A,B,C,D,E,:apply}()
 
 
 # Building upon AbsOreMonomial define monomials indexed by integers
