@@ -4,17 +4,19 @@ struct WCParam{T,S}
     morestep :: Int
 end 
 
-function wc_param(;method ::Val{F} = Val(:f5),
+function wc_param(;method ::Val{F} = Val(:f4),
     bound :: Int = 1,
     morestep :: Int  = 0,
     geobucket ::Val{B} = Val(false),
     stophol  :: Val{C} = Val(false),
     stat :: Val{D} = Val(false),
-    debug :: Val{E} = Val(false)) where {B,C,D,E,F} 
+    debug :: Val{E} = Val(false),
+    select_reducer :: Val{G} = Val(:last)
+    ) where {B,C,D,E,F,G} 
     if F == :f5 
         param =  F5Param{B,C,D,E}()
     elseif (F == :f4) || (F == :buchberger) 
-        param = F4Param{B,C,D,E}()
+        param = F4Param{B,C,D,E,G,:none}()
     end
     return WCParam{typeof(param),F}(param,bound,morestep) 
 end
