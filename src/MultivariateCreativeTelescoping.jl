@@ -9,17 +9,16 @@ using ExportAll
 using FLINT_jll: libflint
 
 global ord_ctr = 0; # used to create new types with metaprogramming
+
 include("globalstats.jl")
 include("primes.jl")
 include("DataStructure_missing.jl")
-# include("SLP.jl")
 
 include("TypeCoefficient.jl")
 include("TypeOreMonomial.jl")
 include("TypeOrePolynomial.jl")
 include("TypeMonOrder.jl")
 include("TypeOreAlgebra.jl")
-include("IndicialEqs.jl")
 
 include("interface_FLINT.jl")
 
