@@ -5,10 +5,16 @@ Return a vector of OrePoly corresponding to the parseable string s in the algebr
 """
 function parse_vector_OrePoly(s :: String, A :: OreAlg)
     expr = Meta.parse(s)
-    if expr.head != :vect 
+    if expr.head != :vect
         error("input is not a parsable vector")
     end
-    return [expr_to_OreAlg(i,A) for i in expr.args]
+    T = eltype_co(A)
+    M = eltype_mo(A)
+    res = Vector{OrePoly{T, M}}(undef, length(expr.args))
+    for (idx, item) in enumerate(expr.args)
+        res[idx] = expr_to_OreAlg(item, A)
+    end
+    return res :: Vector{OrePoly{T, M}}
 end
 
 """
@@ -25,11 +31,11 @@ end
 function expr_to_OreAlg(expr :: Symbol, A :: OreAlg)
     if haskey(A.strvar_to_indexp, "$expr")
         i = A.strvar_to_indexp["$expr"]
-        return makepoly(one(ctx(A)),makemon(i,A))
+        return makepoly(one(ctx(A)),makemon(i,A)) :: OrePoly{eltype_co(A),eltype_mo(A)}
     end
     if haskey(A.ratvars, "$expr")
         c = A.ratvars["$expr"]
-        return makepoly(c, makemon(0,A))
+        return makepoly(c, makemon(0,A)) :: OrePoly{eltype_co(A),eltype_mo(A)}
     end
     error("pb while parsing symbol $(expr) not recognized")
 end
@@ -39,22 +45,26 @@ function expr_to_OreAlg(expr :: Number, A :: OreAlg)
     if iszero(c,A)
         return zero(A)
     end
-    return makepoly(c,makemon(-1,A))
+    return makepoly(c,makemon(-1,A)) :: OrePoly{eltype_co(A),eltype_mo(A)}
 
 end
 
 
 function expr_to_OreAlg(expr :: Expr, A :: OreAlg)
     if expr.head == :call 
-        return  expr_to_OreAlg_call(expr, A)
+        return  expr_to_OreAlg_call(expr, A) :: OrePoly{eltype_co(A),eltype_mo(A)}
     elseif expr.head == :macrocall
-        return expr_to_OreAlg_macrocall(expr,A)
+        return expr_to_OreAlg_macrocall(expr,A) :: OrePoly{eltype_co(A),eltype_mo(A)}
     end
 end
 
 function expr_to_OreAlg_macrocall(expr :: Expr, A :: OreAlg)
-    if (expr.args[1] == GlobalRef(Core, Symbol(Core.var"@big_str"))) || (expr.args[1] ==  GlobalRef(Core, Symbol(Core.var"@int128_str"))) ||  (expr.args[1] ==  GlobalRef(Core, Symbol(Core.var"@uint128_str")))
-        return makepoly(convertn(parse(BigInt,expr.args[3]),ctx(A)),makemon(-1,A))
+    head = expr.args[1]
+    if head === Symbol("@big_str") || head === Symbol("@int128_str") || head === Symbol("@uint128_str") ||
+       head === GlobalRef(Core, Symbol("@big_str")) ||
+       head === GlobalRef(Core, Symbol("@int128_str")) ||
+       head === GlobalRef(Core, Symbol("@uint128_str"))
+        return makepoly(convertn(parse(BigInt, expr.args[3]), ctx(A)), makemon(-1, A)) :: OrePoly{eltype_co(A),eltype_mo(A)}
     end
     error("error while parsing arg $(expr.args[1]) not recognised")
 end
@@ -62,7 +72,7 @@ end
 
 function expr_to_OreAlg_call(expr :: Expr, A :: OreAlg)
     op = expr.args[1]
-    a = expr_to_OreAlg(expr.args[2],A)
+    a = expr_to_OreAlg(expr.args[2],A) 
     len = length(expr.args)
     if op == :- && len == 2
         return mul(opp(one(ctx(A)),ctx(A)),a,A)
