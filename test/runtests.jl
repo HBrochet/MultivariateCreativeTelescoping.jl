@@ -1,6 +1,14 @@
 using MultivariateCreativeTelescoping
 using Test
 
+include("typecoefficient.jl")
+include("typeoremonomial.jl")
+include("typeorepoly.jl")
+include("typemonorder.jl")
+include("typeorealgebra.jl")
+include("parseinputoutput.jl")
+include("orepolyaddmul.jl")
+
 @testset "unused type" begin
     @test isempty(detect_unbound_args(MultivariateCreativeTelescoping)) 
 end
