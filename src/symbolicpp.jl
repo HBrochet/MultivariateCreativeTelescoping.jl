@@ -417,11 +417,16 @@ function symbolicpp(A::alg,
     saturate!(A, rows, basis, todo, done,param,geob)
 
     mx = f4matrix(A, rows, done, interreduction ? BitSet() : inputrows, inputrows, newpivots) 
-    if stat(param)
-         globalstats.counters[:f4_max_mat_size] = max_tdeg(globalstats.counters[:f4_max_mat_size], (length(mx.rows), mx.nbcolumns))
+
+    if stat(param) && (length(mx.rows) + mx.nbcolumns > globalstats.counters[:f4_max_col_size] + globalstats.counters[:f4_max_row_size])
+         globalstats.counters[:f4_max_col_size] = mx.nbcolumns 
+         globalstats.counters[:f4_max_row_size] = length(mx.rows)
     end 
     return mx
 end
+
+max_tdeg(a :: Tuple{Int,Int},b :: Tuple{Int,Int}) = a[1] + a[2] >= b[1] + b[2] ? (a[1],a[2]) : (b[1],b[2]) 
+
 
 function interreductionmx(A :: OreAlg,
                           basis::Vector{OrePoly{I, T}},
