@@ -49,6 +49,7 @@ Base.@propagate_inbounds function Base.setindex!(P::OrePoly{K, M}, t::Tuple{K, M
 end
 
 function degree(p :: OrePoly)
+    isempty(p) && return 0
     return maximum([degree(m[2]) for m in p])
 end
 
@@ -86,11 +87,10 @@ end
 
 function Base.push!(p :: ReuseOrePoly,c :: K, m :: M) where {K,M}
     ind = p.ind
-    if length(p) == ind 
-        grow_to!(p,2*ind)
+    if length(p.op.coeffs) == ind 
+        grow_to!(p,max(1,2*ind))
     end
     p[ind+1] = (c,m) 
     p.ind += 1
     nothing
 end 
-
