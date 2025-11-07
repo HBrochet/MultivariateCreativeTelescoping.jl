@@ -159,14 +159,12 @@ Base.iszero(x :: RatFun, ctx::RatFunCtx) = x == ctx.F(0)
 Base.isone(x :: RatFun, ctx::RatFunCtx) = x == ctx.F(1)
 
 function evaluate(a::RatFun, p::Vector{S}) where {S}
-    num = Nemo.numerator(a, false)
-    den = Nemo.denominator(a, false)
-
     if a isa UnivRatFunModp || a isa UnivRatFunModP || a isa UnivRatFunQQ
         length(p) == 1 || error("the vector p has size $(length(p))")
         return Nemo.evaluate(a, p[1])
     end
-
+    num = Nemo.numerator(a, false)
+    den = Nemo.denominator(a, false)
     return Nemo.evaluate(num, p) // Nemo.evaluate(den, p)
 end
 
