@@ -19,10 +19,10 @@ function initglobalstats!()
               :number_primes,:number_evaluation,:number_pol_evaluation,
               :mct_red_zero,
               :mri_nb_points,
-              :f4_max_mat_size]
+              :f4_max_col_size, :f4_max_row_size
+              ]
         push!(globalstats.counters, p => 0)
     end
-
     empty!(globalstats.reducers)
 end
 
