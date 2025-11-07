@@ -8,7 +8,7 @@ end
 Base.show(io::IO, m :: OreMonVE) = println(io,"Ore monomial")
 
 
-exp(P :: OreMonVE) = P.exp
+Base.exp(P :: OreMonVE) = P.exp
 getexp(m :: OreMonVE, i :: Int)  = m.exp[i]
 makemon(v ::Vector{E}) where E = OreMonVE(SVector{length(v)}(v))
 degree(m ::OreMonVE) = sum(m.exp)
@@ -24,5 +24,5 @@ Base.:(*)(a :: OreMonVE, b :: OreMonVE) = OreMonVE(a.exp + b.exp)
 Base.:(/)(a :: OreMonVE, b :: OreMonVE) = OreMonVE(a.exp - b.exp) 
 Base.:(^)(a :: OreMonVE{N,E}, i :: Integer) where {N,E} = OreMonVE(E(i) * a.exp)
 
-Base.lcm(a ::OreMonVE, b ::OreMonVE{N,E}) where {N,E} = OreMonVE(SVector{N,E}(max(a[i],b[i]) for i in 1:N))
+@inline Base.lcm(a ::OreMonVE, b ::OreMonVE{N,E}) where {N,E} = OreMonVE(SVector{N,E}(max(a[i],b[i]) for i in 1:N))
 Base.sum(a ::OreMonVE) = sum(a.exp)
