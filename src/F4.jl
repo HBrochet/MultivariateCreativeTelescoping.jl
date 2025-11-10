@@ -297,13 +297,13 @@ function findnewrels!(pgb :: PartialGB)
     rows = pgb.candidates
 
     debug(pgb.param) && @debug "symbolic preprocessing"
-    mx = symbolicpp(pgb.alg, rows, activebasis, pgb.param,pgb.geob,true, false)
+    mx = symbolicpp(pgb.alg, rows, activebasis, pgb.param,pgb.geob,false, false)
 
     debug(pgb.param) && @debug "reducing a sparse $(length(mx.rows))x$(mx.nbcolumns) matrix"
+    reducepivots!(mx,pgb.param)
     reduce!(mx,pgb.param)
     # todo are the new pivots nicely reduced ? is it not already done
     reducenewpivots!(mx,pgb.param)
-    
     pgb.newrels = [row(mx, r) for r in mx.newpivots]
     empty!(pgb.candidates)
     return
@@ -317,11 +317,11 @@ function findnewrels!(pgb :: PartialGB, spairs :: Vector{Tuple{Int,Int}})
     rows = pgb.candidates
 
     debug(pgb.param) && @debug "symbolic preprocessing"
-    mx = symbolicpp(pgb.alg, rows, activebasis, pgb.param,pgb.geob,true, false)
+    mx = symbolicpp(pgb.alg, rows, activebasis, pgb.param,pgb.geob,false, false)
 
     debug(pgb.param) && @debug "reducing a sparse $(length(mx.rows))x$(mx.nbcolumns) matrix"
+    reducepivots!(mx,pgb.param)
     reduce!(mx,pgb.param)
-    # todo are the new pivots nicely reduced ? is it not already done
     reducenewpivots!(mx,pgb.param)
     
     # fill non_zero_sps
@@ -330,8 +330,6 @@ function findnewrels!(pgb :: PartialGB, spairs :: Vector{Tuple{Int,Int}})
             push!(non_zero_sps, spairs[i])
         end
     end
-
-
     pgb.newrels = [row(mx, r) for r in mx.newpivots]
     empty!(pgb.candidates)
     return non_zero_sps
@@ -364,16 +362,15 @@ function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param(
             generatespairs!(pgb)
             spairs = selectspairs!(pgb,param)
             non_zero_spairs = findnewrels!(pgb,spairs)
-
             push!(trace.spairs, non_zero_spairs)
+            @assert length(non_zero_spairs) == length(pgb.newrels)
         elseif apply(param)                 
             add_new_rels!(pgb)
-
             round > length(trace.spairs) && break
-
+            nb_spairs = length(trace.spairs[round])
             selectspairs!(pgb,param,trace,round)
             findnewrels!(pgb)
-
+            @assert nb_spairs == length(pgb.newrels) 
         else 
             generatespairs!(pgb)
             selectspairs!(pgb,param)
