@@ -147,6 +147,7 @@ function saturate!(A::alg,
         # search for a reducer
 
         i = select_reducer(A,basis,m,Val(select_reducer(param)))
+
         if i == 0 # no reducer found
             continue 
         end
@@ -443,15 +444,67 @@ function interreductionmx(A :: OreAlg,
     done = Set{T}()
     inputrows = BitSet()
 
-    for p in basis
+    for (i,p) in enumerate(basis)
         pushrow!(A, rows, p, todo, done)
         push!(inputrows, length(rows))
-        saturate!(A, rows, currentbasis, todo, done,param,geob)
-        push!(currentbasis, p)
+        saturate_lm!(basis,rows, todo,done,A,i,param,geob) # deal with the monomial lm(p) while avoiding to use p as reducer 
+    end
+    
+    saturate!(A, rows, basis, todo, done,param,geob)
+
+
+    return f4matrix(A, rows, done, inputrows, inputrows, BitSet())
+end
+
+
+function saturate_lm!(basis :: Vector{OrePoly{T,M}},
+                      rows :: Vector{OrePoly{T,M}},
+                      todo :: Set{M}, 
+                      done ::Set{M}, 
+                      A :: OreAlg, 
+                      l :: Int,
+                      param :: F4Param,
+                      geob :: GeoBucket
+                          ) where {T,M}
+    m = mon(basis[l],1)    
+
+    m ∈ done && return 
+    push!(done, m)
+
+    # search for a reducer for m but avoid l 
+    we= 2^31
+    i = 0 
+    for j in 1:length(basis)
+        j == l && continue 
+        if divide(mon(basis[j],1),m,A) 
+            w = weight(basis[j],Val(select_reducer(param)))
+            if w <= we
+                i = j 
+                we = w 
+            end
+        end
+    end
+    i == 0 && return # no reducer found 
+
+    red = basis[i]
+    if geobucket(param)
+        sred = shift(red, m,A,geob)
+    else 
+        sred = shift(red, m,A)
+    end
+    if stat(param) 
+        lmred = mon(red,1)
+        globalstats.counters[:f4_nb_reducer_computed] += 1
+        globalstats.counters[:f4_size_reducer] += length(sred)
+        globalstats.counters[:f4_size_m]+= sum(m/lmred)
+        globalstats.counters[:f4_deg_reducer] += maxdeg(sred)
+        add_reducer_globalstats!(i, m/lmred)
     end
 
-    return f4matrix(A, rows, done, BitSet(), inputrows, BitSet())
+    pushrow!(A, rows, sred, todo, done)
+    return 
 end
+
 
 
 function shift(P :: OrePoly{K,M}, m :: M, A :: alg,geob :: GeoBucket) where {K,M,alg <: OreAlg}
