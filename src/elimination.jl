@@ -128,6 +128,7 @@ function reduce!(mx::NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, 
             end
         end
         
+
         # if row is a new pivot, reduce its tail and add it to the pivot list
         if leadingterm > 0 
             
@@ -146,27 +147,6 @@ function reduce!(mx::NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, 
     return
 end
 
-
-function reduce_full_known_pivots!(mx::NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, I}
-    #@assert all([i == 0 ? true : ismonic(mx.rows[i]) for i in mx.pivots])
-    
-    buffer = Vector{Tbuf}(undef, mx.nbcolumns)
-    # iter = 0 
-    for (i, row) in enumerate(mx.rows)
-        if isempty(row) || ispivot(mx, i)
-            continue
-        end
-
-        fillbuffer!(buffer, row, ctx(mx.A))
-
-        # top reduction
-        for j in mon(row,1):mx.nbcolumns
-            b = elementary_reduction_in_buffer(mx, buffer, j,param)
-        end
-        mx.rows[i] = savebuffer!(ctx(mx.A), buffer, row, mon(row,1), false) # todo: remember the lt and remove this call for zero reduction
-    end
-    return
-end
 
 function reducepivots!(mx :: NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, I}
 
