@@ -353,7 +353,6 @@ function f4matrix(A::alg,
             end
         end
     end
-
     f4matrix = F4Matrix{M, IdxMon,eltype_co(A), typeof(A)}(
         A, monomials, monomialtoidx,
         length(monomials), rows, pivots,
@@ -405,7 +404,7 @@ function symbolicpp(A::alg,
         else 
             # otherwise the spair could be a new pivot
             m = mon(p,1)
-            if !any(divide(mon(g,1),m,A) for g in basis) && !any(divide(mon(g,1),m,A) for g in rows)
+            if !any(divide(mon(g,1),m,A) for g in basis) && !any(mon(g,1) == m for g in rows)
                 push!(done, m)
                 push!(newpivots,length(rows)+1)
             end
@@ -413,7 +412,6 @@ function symbolicpp(A::alg,
         end
         push!(inputrows, length(rows))
     end
-
     saturate!(A, rows, basis, todo, done,param,geob)
 
     mx = f4matrix(A, rows, done, interreduction ? BitSet() : inputrows, inputrows, newpivots) 
