@@ -300,7 +300,7 @@ function findnewrels!(pgb :: PartialGB)
     mx = symbolicpp(pgb.alg, rows, activebasis, pgb.param,pgb.geob,false, false)
 
     debug(pgb.param) && @debug "reducing a sparse $(length(mx.rows))x$(mx.nbcolumns) matrix"
-    reducepivots!(mx,pgb.param)
+    # reducepivots!(mx,pgb.param)
     reduce!(mx,pgb.param)
     # todo are the new pivots nicely reduced ? is it not already done
     reducenewpivots!(mx,pgb.param)
@@ -320,7 +320,7 @@ function findnewrels!(pgb :: PartialGB, spairs :: Vector{Tuple{Int,Int}})
     mx = symbolicpp(pgb.alg, rows, activebasis, pgb.param,pgb.geob,false, false)
 
     debug(pgb.param) && @debug "reducing a sparse $(length(mx.rows))x$(mx.nbcolumns) matrix"
-    reducepivots!(mx,pgb.param)
+    # reducepivots!(mx,pgb.param)
     reduce!(mx,pgb.param)
     reducenewpivots!(mx,pgb.param)
     
