@@ -201,7 +201,6 @@ function selectspairs!(pgb :: PartialGB, param :: F4Param)
         spairs = Tuple{Int,Int}[]
     end
 
-
     #todo: is it the best strategy for an elim order ? 
     sort!(pgb.spairs, rev=true, order=order(pgb.alg))
     deg = max_deg_block(last(pgb.spairs).lcm,pgb.alg)
@@ -228,10 +227,9 @@ function selectspairs!(pgb :: PartialGB, param :: F4Param)
         end
         if !isempty(p)
             push!(pgb.candidates, p)
-        end
-
-        if learn(param) 
-            push!(spairs, (sp.left, sp.right))
+            if learn(param) 
+                push!(spairs, (sp.left, sp.right))
+            end
         end
         pop!(pgb.spairs)
         ctr += 1 
