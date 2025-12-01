@@ -209,13 +209,13 @@ end
 # wrapper for using crt with tracer = Val(:apply) 
 function weyl_closure_internal_crt(trace :: WCTrace, gens::Vector{OrePoly{T,M}}, A :: OreAlg, init :: WeylClosureInit, param :: WCParam) where {T,M}
     par = wc_param_learn_to_apply(param)
-    println("learn $(learn(par)) et $(apply(par))")
+    # println("learn $(learn(par)) et $(apply(par))")
     return weyl_closure_internal(gens, A, init, par, trace = trace)
 end
 
 # wrapper for using crt with tracer = Val(:learn) 
 function weyl_closure_internal_crt(gens::Vector{OrePoly{T,M}}, A :: OreAlg, init :: WeylClosureInit, param :: WCParam; tracer :: Val{B} = Val(false)) where {T,M,B}
-    println("learn $(learn(param)) et $(apply(param))")
+    # println("learn $(learn(param)) et $(apply(param))")
     B && @assert learn(param) # for compatibility with compute_with_crt
     return weyl_closure_internal(gens, A, init, param, trace = wc_trace())
 
