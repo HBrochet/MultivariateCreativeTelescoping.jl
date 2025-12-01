@@ -308,7 +308,7 @@ function findnewrels!(pgb :: PartialGB)
 end
 
 function findnewrels!(pgb :: PartialGB, spairs :: Vector{Tuple{Int,Int}})
-    isempty(pgb.candidates) && return
+    isempty(pgb.candidates) && return Tuple{Int,Int}[]
     non_zero_sps = Tuple{Int,Int}[] # remember spairs that were not reduced to zero
     activebasis = [pgb.basis[i] for i in pgb.active]
 
@@ -343,8 +343,8 @@ function f4(gens :: Vector{OrePoly{K,M}}, A :: Alg; param :: F4Param = f4_param(
     pgb = partialgb(gens, A,param)
     round = 0
     if apply(param) && length(trace.spairs) == 0
-        sort!(basis, lt = (x,y) -> lt(order(A),x[1][2], y[1][2]), rev = true)
-        return pgb.basis
+        sort!(pgb.newrels, lt = (x,y) -> lt(order(A),x[1][2], y[1][2]), rev = true)
+        return pgb.newrels
     end
 
     while !iscomplete(pgb)
