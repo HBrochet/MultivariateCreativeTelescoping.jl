@@ -9,7 +9,7 @@ function ann_inv_pol(p :: OrePoly{K,M},A :: OreAlg) where {K,M}
     rel = mul(p,T,A)
     rel = sub!(rel,one(A),A)
     push!(g,rel)
-    return saturation(g,indT,A)
+    return saturation(g,indT,A,wc_trace())
 end
 
 
