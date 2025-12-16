@@ -1,6 +1,6 @@
 ## Gröbner bases 
 This package implements two algorithms to compute Gröbner bases, namely F4 and F5. The F5 implementation is based on [Lairez2024](https://arxiv.org/abs/2210.13788).
-It is recommended to use the F5 implementation as it is faster.
+It is recommended to use the F4 implementation as it is faster.
 
 ```@docs
 f4
@@ -96,7 +96,7 @@ vector of 3 OrePoly
 (3)dxy^2 + (2)dyx
 (3)dxx + (2)dyy + (1)
 ```
-
+<!-- 
 ## Integral of a module 
 
 Keeping the same notation as in the previous subsection, let ``S`` be a submodule of ``D^r`` and let ``M \stackrel{def}{=} D^r/S``. The integral of the module ``M`` 
@@ -182,4 +182,4 @@ Ore polynomial
 julia> prettyprint(red2,A)
 (1)
 ```
-
+ -->

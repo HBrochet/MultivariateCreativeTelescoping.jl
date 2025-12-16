@@ -27,20 +27,22 @@ We define the algebra
 ```math
  \mathbb{Q}(t)[x]\langle \partial_t, \partial_x\rangle
 ```
-with the order lex ``dt`` ``x`` ``dx``. 
+with the order lex ``dt`` > grevlex ``x`` ``dx``. 
 
 ```jldoctest Quickstart
-julia> A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]),poldiffvars=(["x"],["dx"]))
+julia> A = OreAlg(order = "lex dt > grevlex x dx",ratdiffvars=(["t"],["dt"]),poldiffvars=(["x"],["dx"]))
 Ore algebra
 ```
 
 We remove the largest polynomial factor in the integrand (here ``x``). This is done for efficiency reasons.
  Then we define a set of differential equations satisfied by what remains, that is ``1/(x-t)``. 
+They must generate a D-finite ideal.
 ```jldoctest Quickstart
 julia> ann = [parse_OrePoly("dt*(x-t)",A), parse_OrePoly("dx*(x-t)",A)]
 Vector of Ore polynomials
 ```
 These equations do not necessarily define a holonomic ideal hence we have to take the Weyl closure.
+Note that the WeylClosure command returns only an holonomic approximation.
 ```jldoctest Quickstart
 julia> init = weyl_closure_init(A)
 WeylClosureInit

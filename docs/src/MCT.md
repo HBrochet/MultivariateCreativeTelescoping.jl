@@ -27,7 +27,7 @@ Assumption:
  - gb is a Gröbner basis of a holonomic subideal of ``I`` for the order defined in A
  - A corresponds to the algebra ``D`` and its order eliminates ``dt``
 
-It is advised for efficiency to use an order of the form lex ``dt`` > grevlex [list of polynomial variables] > grevlex [list of differential variables]
+It is advised for efficiency to use an order of the form lex ``dt`` > grevlex [list of other polynomial variables].
 
 
 #### Example
@@ -44,10 +44,10 @@ julia> using MultivariateCreativeTelescoping
 ```
  We define the algebra.
 ```jldoctest example
-julia> A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]),poldiffvars=(["x"],["dx"]))
+julia> A = OreAlg(order = "lex dt > grevlex x dx",ratdiffvars=(["t"],["dt"]),poldiffvars=(["x"],["dx"]))
 Ore algebra
 ```
-Then we compute an holonomic ideal included in the annihilator of ``1/(x-t)``. For more details see the Weyl closure subsection of the other functionnalities section.
+Then we compute an holonomic ideal included in the annihilator of ``1/(x-t)``. For more details see the Weyl closure subsection of the other functionalities section.
 
 ```jldoctest example
 julia> ann = [parse_OrePoly("dt*(x-t)",A), parse_OrePoly("dx*(x-t)",A)]
