@@ -10,9 +10,9 @@ end
 
 Let us demonstrate how this package works on a very simple example based on Cauchy's integral formula. We will check that the integral 
 ```math
-I(t) = \int_\gamma \frac{x}{x-t}dx
+I(t) = \int_\gamma \frac{x}{x-t}dx,
 ```
-where ``\gamma`` is a loop satisfies the differential equation ``t\partial_t -1`` for any ``t`` inside that loop. This reflects the well-known fact ``I(t) = 2i\pi t``.
+where ``\gamma`` is a loop, satisfies the differential equation ``t\partial_t -1`` for any ``t`` inside that loop. This reflects the well-known fact that ``I(t) = 2i\pi t``.
 
 
 
