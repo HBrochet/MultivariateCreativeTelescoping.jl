@@ -3,8 +3,8 @@
 **MultivariateCreativeTelescoping.jl** is a Julia package for computing linear differential equations satisfied by parametric integrals using *creative telescoping* (see, e.g., [this reference](https://theses.hal.science/tel-01069831) for an introduction).
 
 The package implements:
-- the integration algorithm introduced in [this paper](https://arxiv.org/abs/2504.12724), and  
-- an algorithm for approximating the Weyl closure, presented in my PhD thesis ([link](https://hbrochet.github.io/articles/thesis.pdf)).
+- the integration algorithm introduced in [this article](https://arxiv.org/abs/2504.12724), and  
+- an algorithm for approximating the Weyl closure, presented in my [PhD thesis](https://hbrochet.github.io/articles/thesis.pdf).
 
 Combined, these algorithms make it possible to compute integrals with natural boundaries of the form
 ```math
