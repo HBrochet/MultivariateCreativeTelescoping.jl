@@ -42,7 +42,7 @@ julia> ann = [parse_OrePoly("dt*(x-t)",A), parse_OrePoly("dx*(x-t)",A)]
 Vector of Ore polynomials
 ```
 These equations do not necessarily define a holonomic ideal hence we have to take the Weyl closure.
-Note that the WeylClosure command returns only an holonomic approximation.
+Note that the WeylClosure command returns only an holonomic approximation of the Weyl closure.
 ```jldoctest Quickstart
 julia> init = weyl_closure_init(A)
 WeylClosureInit
