@@ -1,15 +1,17 @@
 # MultivariateCreativeTelescoping.jl
 
+**MultivariateCreativeTelescoping.jl** is a Julia package for computing linear differential equations satisfied by parametric integrals using *creative telescoping* (see, e.g., [this reference](https://theses.hal.science/tel-01069831) for an introduction).
 
-MultivariateCreativeTelescoping is a package to compute linear differential equations satisfied by parametric integrals using a method called creative telescoping (see e.g. [here](https://theses.hal.science/tel-01069831) for an introduction to creative telescoping). This package implements an algorithm recently presented at the JNCF conference [[slides]](https://www.cirm-math.fr/RepOrga/3047/Slides/Brochet.pdf) and an article is being written.
+The package implements:
+- the integration algorithm introduced in [this paper](https://arxiv.org/abs/2504.12724), and  
+- an algorithm for approximating the Weyl closure, presented in my PhD thesis ([link](https://hbrochet.github.io/articles/thesis.pdf)).
 
-This algorithm is dedicated to integrals with natural boundaries of the form
+Combined, these algorithms make it possible to compute integrals with natural boundaries of the form
 ```math
-I(t) = \int f(t,\boldsymbol{x})\boldsymbol{dx}
+I(t) = \int f(t,\boldsymbol{x})\,\mathrm{d}\boldsymbol{x},
 ```
-where $\boldsymbol{x}=(x_1,\dots,x_n)$ and $f$ is a D-finite/holonomic function that satisfies PDEs with coefficients in $\mathbb{Q}(t,\boldsymbol{x})$.
 
+where $\boldsymbol{x} = (x_1,\dots,x_n)$ and $f$ is a D-finite/holonomic function satisfying a system of partial differential equations with coefficients in $\mathbb{Q}(t,\boldsymbol{x})$.
 
-This package is still in developpement but an early version is available.
-The documentation of the package can be found [here](https://hbrochet.github.io/MultivariateCreativeTelescoping.jl/dev/).
-
+The package is still under development, but an early version is already available.  
+The documentation can be found [here](https://hbrochet.github.io/MultivariateCreativeTelescoping.jl/dev/).
