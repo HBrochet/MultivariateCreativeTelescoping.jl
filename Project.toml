@@ -1,6 +1,6 @@
 name = "MultivariateCreativeTelescoping"
 uuid = "a544615c-5478-485f-b703-83893a5a3b3b"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Hadrien Brochet <hadrien.brochet@inria.fr> and contributors"]
 
 [deps]
