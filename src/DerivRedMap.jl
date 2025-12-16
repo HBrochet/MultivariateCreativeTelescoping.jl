@@ -251,7 +251,7 @@ function find_der_red_map(spol :: OrePoly, g1 :: Vector{OrePoly{T,M}}, red_dt ::
     dt = OrePoly([one(ctx(A))], [makemon(1,A)])
 
     while !isempty(toadd)
-        m = pop!(toadd)
+        m = popfirst!(toadd)
         dtm = mul(dt,OrePoly([one(ctx(A))],[m]),A)
         dtm = div!(dtm,[red_dt],A)
         dtm = GD_reduction1!(dtm, g1, A)
@@ -278,7 +278,7 @@ function find_der_red_map(spol :: OrePoly, g1 :: Vector{OrePoly{T,M}}, red_dt ::
 
 
     while !isempty(toadd)
-        m = pop!(toadd)
+        m = popfirst!(toadd)
         dtm = OrePoly([cdt],[mdt*m])
         init_GeoBucket!(geob,dtm)
         addmul_geobucket!(geob,c,m,red_dt,A)

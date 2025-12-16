@@ -45,7 +45,7 @@ end
 function mct_op_to_mat(rels :: Vector{OrePoly{T,M}}, A :: OreAlg) where {T,M}
     s = SortedSet{eltype_mo(A)}(order(A),m  for p in rels for m in mons(p))
     len = length(s)
-    bijection = [pop!(s) for i in 1:len]
+    bijection = [popfirst!(s) for i in 1:len]
     bij_inv = Dict{eltype_mo(A),Int}(m=>i for (i,m) in enumerate(bijection))
 
     S = matrix_space(parent(coeff(rels[1],1)),length(rels),len)
