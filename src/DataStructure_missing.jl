@@ -5,13 +5,13 @@ function Base.append!(s :: SortedSet{M}, v :: Vector{M}) where M
     return nothing 
 end
 
-@inline function Base.popfirst!(m::SortedSet)
-    i = DataStructures.beginloc(m.bt)
-    i == 2 && throw(BoundsError())
-    k = m.bt.data[i].k
-    delete!(m.bt, i)
-    return k
-end
+# @inline function Base.popfirst!(m::SortedSet)
+#     i = DataStructures.beginloc(m.bt)
+#     i == 2 && throw(BoundsError())
+#     k = m.bt.data[i].k
+#     delete!(m.bt, i)
+#     return k
+# end
 
 
 @inline function poplast!(m::SortedSet)

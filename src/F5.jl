@@ -210,8 +210,7 @@ function sigbasis(gen :: Vector{OrePoly{K,M}}, A :: OreAlg, param :: F5Param) wh
             delete_op_with_T!(sgb,A)
         end
         debug(param) && @debug "size of the signature queue: $(length(Q))"
-
-        sig = pop!(Q)
+        sig = popfirst!(Q)
         if stat(param)
             globalstats.counters[:f5_candidate_signatures] += 1
         end
