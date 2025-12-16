@@ -344,11 +344,57 @@ end
 # add the product c*m*f to g. 
 # The function used depends on the choice of representation of the monomials 
 function addmul_geobucket!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg; mod_der :: Val{B} = Val(false) ) where {K,M,B}
+    if (A.nlv > 0) && locvar_derivative_interaction(m, f, A)
+        # Fallback to the generic multiplication when localisation variables
+        # interact with derivatives so that we keep the correct chain rule terms.
+        current = normalform(g, A)
+        prod = mul((c, m), f, A)
+        res = add(current, prod, A)
+        fill!(g.indices, 0)
+        init_GeoBucket!(g, res)
+        return g
+    end
     if A.varord == "dright" 
         return addmul_geobucket_dright!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg)
     else # A.varord = "dleft" 
         return addmul_geobucket_dleft!(g :: GeoBucket, c:: K, m :: M, f :: OrePoly, A:: OreAlg, mod_der=Val(B))
     end
+end
+
+function locvar_derivative_interaction(m :: M, f :: OrePoly, A :: OreAlg) where M
+    der_end = A.nrdv + A.npdv
+    loc_start = A.nrdv + 2*A.npdv + A.npv + 1
+    loc_end = loc_start + A.nlv - 1
+
+    der_end == 0 && loc_start > loc_end && return false
+
+    has_der_m = any(m[i] > 0 for i in 1:der_end)
+    has_loc_m = loc_start <= loc_end && any(m[i] > 0 for i in loc_start:loc_end)
+
+    has_der_f = false
+    has_loc_f = false
+    for i in 1:length(f)
+        mo = mon(f, i)
+        if !has_der_f
+            for j in 1:der_end
+                if mo[j] > 0
+                    has_der_f = true
+                    break
+                end
+            end
+        end
+        if !has_loc_f && loc_start <= loc_end
+            for j in loc_start:loc_end
+                if mo[j] > 0
+                    has_loc_f = true
+                    break
+                end
+            end
+        end
+        has_der_f && has_loc_f && break
+    end
+
+    return (has_loc_m && has_der_f) || (has_der_m && has_loc_f)
 end
 
 # this new type is just here to create a custom iterator needed in addmul_geobucket 
