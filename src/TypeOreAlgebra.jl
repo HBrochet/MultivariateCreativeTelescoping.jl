@@ -8,6 +8,7 @@ mutable struct OreAlgInput
     polvars :: Vector{String}
     locvars :: Tuple{Vector{String},Vector{String}}
     nomul :: Vector{String}
+    fraction_free :: Bool
     varord :: String
 end
 
@@ -42,7 +43,8 @@ end
             polvars :: Vector{String} = String[],
             locvars :: Tuple{Vector{String},Vector{String}} = (String[],String[]),
             order :: String = "",
-            nomul :: Vector{String} = String[]
+            nomul :: Vector{String} = String[],
+            fraction_free :: Bool = false
 """
 function OreAlg(;order :: String = "",
     char :: Int = 0,
@@ -52,10 +54,11 @@ function OreAlg(;order :: String = "",
     polvars :: Vector{String} = String[],
     locvars :: Tuple{Vector{String},Vector{String}} = (String[],String[]),
     nomul :: Vector{String} = String[],
+    fraction_free :: Bool = false,
     varord :: String = "dleft")
 
     ### Create context for coefficients
-    ctx = make_coeff_context(char,ratvars,ratdiffvars)
+    ctx = make_coeff_context(char,ratvars,ratdiffvars,fraction_free)
 
     ### Initialising variable name tables
     sti, its, rv, rti, itr = make_var_tables(ratvars,ratdiffvars,poldiffvars,polvars,locvars,ctx)
@@ -68,7 +71,7 @@ function OreAlg(;order :: String = "",
     ### Creating the monomial order
     ord = make_order(order,sti,Val(M))
 
-    inp = OreAlgInput(order, char,ratvars, ratdiffvars,poldiffvars,polvars,locvars,nomul,varord)
+    inp = OreAlgInput(order, char,ratvars, ratdiffvars,poldiffvars,polvars,locvars,nomul,fraction_free,varord)
 
     ### Computing the polynomials w.r.t. which we localize and their derivatives
     tmpA = OreAlg{eltype1_ctx(ctx), typeof(ctx),M,typeof(ord)}(sti,
@@ -110,7 +113,7 @@ function OreAlg(;order :: String = "",
 end
 
 
-function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars :: Tuple{Vector{String},Vector{String}})
+function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars :: Tuple{Vector{String},Vector{String}}, fraction_free :: Bool)
     # coefficients will be univariate rational functions 
     if (length(ratvars) + length(ratdiffvars[1])) ==1
         if length(ratvars) == 1 
@@ -120,10 +123,16 @@ function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars 
         end
         if char > 0 
             S,vars = polynomial_ring(Native.GF(char),var)
+            if fraction_free
+                return RingCoeffCtx(S)
+            end
             F = fraction_field(S)
             return UnivRatFunModpCtx(F,S,[vars],char)
         else 
             S,vars = polynomial_ring(ZZ,var)
+            if fraction_free
+                return RingCoeffCtx(S)
+            end
             F = fraction_field(S)
             return UnivRatFunQQCtx(F,S,[vars])
         end
@@ -131,10 +140,16 @@ function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars 
     elseif (length(ratvars) + length(ratdiffvars[1])) > 1
         if char > 0 
             S,vars = polynomial_ring(Native.GF(char),vcat(ratdiffvars[1],ratvars))
+            if fraction_free
+                return RingCoeffCtx(S)
+            end
             F = fraction_field(S)
             return RatFunModpCtx(F,S,vars,char)
         else 
             S,vars = polynomial_ring(ZZ,vcat(ratdiffvars[1],ratvars))
+            if fraction_free
+                return RingCoeffCtx(S)
+            end
             F = fraction_field(S)
             return RatFunQQCtx(F,S,vars)
         end
@@ -142,10 +157,28 @@ function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars 
     else 
         if char > 0 
             return Nmod32Γ(char)
-        else 
+        elseif fraction_free 
+            return RingCoeffCtx(ZZ)
+        else
             return QQCtx()
         end
     end
+end
+
+coeff_vars(ctx :: RatFunCtx) = ctx.vars
+coeff_vars(ctx :: RingCoeffCtx) = collect(gens(ctx.R))
+
+coeff_vars(ctx ::QQCtx) = nothing
+coeff_vars(ctx ::Nmod32Γ) = nothing 
+coeff_vars(ctx ::RingCoeffCtx{ZZRingElem,ZZ}) = nothing
+
+
+@inline function coeff_var(ctx :: RatFunCtx, vars, i :: Int)
+    return ctx.F(vars[i])
+end
+
+@inline function coeff_var(:: RingCoeffCtx, vars, i :: Int)
+    return vars[i]
 end
 
 function make_var_tables(ratvars :: Vector{String},
@@ -163,8 +196,10 @@ function make_var_tables(ratvars :: Vector{String},
     rti = Dict{String,Int}()
     itr = String[]
 
+    coeffvars = coeff_vars(ctx)
+
     for (i,s) in enumerate(ratvars)
-        rv[s] = ctx.F(ctx.vars[i+length(ratdiffvars[1])])
+        rv[s] = coeff_var(ctx, coeffvars, i + length(ratdiffvars[1]))
     end
 
 
@@ -173,7 +208,7 @@ function make_var_tables(ratvars :: Vector{String},
         push!(its,s)
     end
     for (i,s) in enumerate(ratdiffvars[1])
-        rv[s] = ctx.F(ctx.vars[i])
+        rv[s] = coeff_var(ctx, coeffvars, i)
         push!(itr,s)
         rti[s] = i
     end
@@ -230,6 +265,7 @@ function OreAlg(inp :: OreAlgInput)
                 polvars = inp.polvars,
                 locvars = inp.locvars,
                 nomul = inp.nomul,
+                fraction_free = inp.fraction_free,
                 varord = inp.varord)
 end
 
@@ -508,3 +544,10 @@ function unflatten(p :: OrePoly{T,K},A :: OreAlg) where {T,K}
     return res 
 end
  
+
+
+
+
+
+
+

@@ -1,4 +1,5 @@
 using Test
+using Nemo: gens
 using MultivariateCreativeTelescoping
 
 @testset "TypeOreAlgebra basics" begin
@@ -35,4 +36,16 @@ using MultivariateCreativeTelescoping
     undef = @inferred undefOrePoly(2, A)
     @test length(undef.coeffs) == 2
     @test length(undef.mons) == 2
+end
+
+@testset "TypeOreAlgebra fraction-free coefficients" begin
+    A_frac = OreAlg(order = "lex x dx", ratvars = ["t"], poldiffvars = (["x"], ["dx"]))
+    @test ctx(A_frac) isa UnivRatFunQQCtx
+
+    A_poly = OreAlg(order = "lex x dx", ratvars = ["t"], poldiffvars = (["x"], ["dx"]), fraction_free = true)
+    @test ctx(A_poly) isa RingCoeffCtx
+    @test A_poly.ratvars["t"] == first(collect(gens(ctx(A_poly).R)))
+
+     A_poly = OreAlg(order = "lex x dt dx", ratdiffvars = (["t"],["dt"]), poldiffvars = (["x"], ["dx"]), fraction_free = true)
+    @test ctx(A_poly) isa RingCoeffCtx
 end
