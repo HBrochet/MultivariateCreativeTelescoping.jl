@@ -193,3 +193,194 @@ end
     @test @inferred(convertn(7, ctx)) == QQ(7)
     @test @inferred(normal(a, ctx)) === a
 end
+
+# todo I get an error line 198 explain me why
+@testset "TypeCoefficient: RingCoeffCtx - ZZRingElem" begin
+    ctx = RingCoeffCtx(ZZ)
+    a = ZZ(5)
+    b = ZZ(-3)
+    @test add(a, b, ctx) == ZZ(2)
+    @test sub(a, b, ctx) == ZZ(8)
+    @test opp(a, ctx) == ZZ(-5)
+    @test mul(a, b, ctx) == ZZ(-15)
+    @test submul(a, b, a, ctx) == a - b * a
+    @test convert(4, ctx) == ZZ(4)
+    @test convertn(-6, ctx) == ZZ(-6)
+    @test normal(a, ctx) === a
+    @test inflate(a, ctx) === a
+    @test deflate(a, ctx) === a
+    @test zero(ctx) == ZZ(0)
+    @test one(ctx) == ZZ(1)
+    @test iszero(zero(ctx), ctx)
+    @test isone(one(ctx), ctx)
+    a1 = deepcopy(a)
+    @test add!(a1, b, ctx) == a + b
+    b1 = deepcopy(b)
+    @test sub!(b1, a, ctx) == b - a
+    c1 = deepcopy(a)
+    @test mul!(c1, b, ctx) == a * b
+    d1 = deepcopy(a)
+    @test opp!(d1, ctx) == -a
+end
+
+@testset "TypeCoefficient: RingCoeffCtx - ZZPolyRingElem" begin
+    R, x = polynomial_ring(ZZ, "x")
+    ctx = RingCoeffCtx(R)
+    a = x + 1
+    b = x^2 - 2x + 3
+    @test add(a, b, ctx) == a + b
+    @test sub(b, a, ctx) == b - a
+    @test opp(b, ctx) == -b
+    @test mul(a, b, ctx) == a * b
+    @test submul(b, a, b, ctx) == b - a * b
+    @test convert(7, ctx) == R(7)
+    @test convertn(-4, ctx) == R(-4)
+    @test normal(a, ctx) === a
+    @test inflate(b, ctx) === b
+    @test deflate(a, ctx) === a
+    @test zero(ctx) == R(0)
+    @test one(ctx) == R(1)
+    @test iszero(zero(ctx), ctx)
+    @test isone(one(ctx), ctx)
+    a1 = deepcopy(a)
+    @test add!(a1, b, ctx) == a + b
+    b1 = deepcopy(b)
+    @test sub!(b1, a, ctx) == b - a
+    c1 = deepcopy(a)
+    @test mul!(c1, b, ctx) == a * b
+    d1 = deepcopy(a)
+    @test opp!(d1, ctx) == -a
+end
+
+@testset "TypeCoefficient: RingCoeffCtx - ZZMPolyRingElem" begin
+    R, (x, y) = polynomial_ring(ZZ, ["x", "y"])
+    ctx = RingCoeffCtx(R)
+    a = x + y
+    b = x * y + 2
+    @test add(a, b, ctx) == a + b
+    @test sub(b, a, ctx) == b - a
+    @test opp(a, ctx) == -a
+    @test mul(a, b, ctx) == a * b
+    @test submul(a, b, a, ctx) == a - b * a
+    @test convert(3, ctx) == R(3)
+    @test convertn(-5, ctx) == R(-5)
+    @test normal(a, ctx) === a
+    @test inflate(b, ctx) === b
+    @test deflate(a, ctx) === a
+    @test zero(ctx) == R(0)
+    @test one(ctx) == R(1)
+    a1 = deepcopy(a)
+    @test add!(a1, b, ctx) == a + b
+    b1 = deepcopy(b)
+    @test sub!(b1, a, ctx) == b - a
+    c1 = deepcopy(a)
+    @test mul!(c1, b, ctx) == a * b
+    d1 = deepcopy(a)
+    @test opp!(d1, ctx) == -a
+end
+
+@testset "TypeCoefficient: RingCoeffCtx - fpPolyRingElem" begin
+    R, x = polynomial_ring(GF(7), "x")
+    ctx = RingCoeffCtx(R)
+    a = x + 2
+    b = x^2 + 3
+    @test add(a, b, ctx) == a + b
+    @test sub(b, a, ctx) == b - a
+    @test opp(a, ctx) == -a
+    @test mul(a, b, ctx) == a * b
+    @test submul(b, a, b, ctx) == b - a * b
+    @test convert(5, ctx) == R(5)
+    @test convertn(-3, ctx) == R(-3)
+    @test normal(a, ctx) === a
+    @test inflate(b, ctx) === b
+    @test deflate(a, ctx) === a
+    @test zero(ctx) == R(0)
+    @test one(ctx) == R(1)
+    a1 = deepcopy(a)
+    @test add!(a1, b, ctx) == a + b
+    b1 = deepcopy(b)
+    @test sub!(b1, a, ctx) == b - a
+    c1 = deepcopy(a)
+    @test mul!(c1, b, ctx) == a * b
+    d1 = deepcopy(a)
+    @test opp!(d1, ctx) == -a
+end
+
+@testset "TypeCoefficient: RingCoeffCtx - fpMPolyRingElem" begin
+    R, (x, y) = polynomial_ring(GF(5), ["x", "y"])
+    ctx = RingCoeffCtx(R)
+    a = x + y + 1
+    b = x * y + 2
+    @test add(a, b, ctx) == a + b
+    @test sub(b, a, ctx) == b - a
+    @test opp(b, ctx) == -b
+    @test mul(a, b, ctx) == a * b
+    @test submul(a, b, a, ctx) == a - b * a
+    @test convert(4, ctx) == R(4)
+    @test convertn(-2, ctx) == R(-2)
+    @test normal(a, ctx) === a
+    @test inflate(b, ctx) === b
+    @test deflate(a, ctx) === a
+    a1 = deepcopy(a)
+    @test add!(a1, b, ctx) == a + b
+    b1 = deepcopy(b)
+    @test sub!(b1, a, ctx) == b - a
+    c1 = deepcopy(a)
+    @test mul!(c1, b, ctx) == a * b
+    d1 = deepcopy(a)
+    @test opp!(d1, ctx) == -a
+end
+
+@testset "TypeCoefficient: RingCoeffCtx - FpPolyRingElem" begin
+    p = ZZ(2305843009213693951) # large prime to force Fp type
+    Fp = GF(p)
+    R, x = polynomial_ring(Fp, "x")
+    ctx = RingCoeffCtx(R)
+    a = x + 1
+    b = x^2 + Fp(3)
+    @test add(a, b, ctx) == a + b
+    @test sub(b, a, ctx) == b - a
+    @test opp(a, ctx) == -a
+    @test mul(a, b, ctx) == a * b
+    @test submul(b, a, b, ctx) == b - a * b
+    @test convert(6, ctx) == R(6)
+    @test convertn(-7, ctx) == R(-7)
+    @test normal(a, ctx) === a
+    @test inflate(b, ctx) === b
+    @test deflate(a, ctx) === a
+    a1 = deepcopy(a)
+    @test add!(a1, b, ctx) == a + b
+    b1 = deepcopy(b)
+    @test sub!(b1, a, ctx) == b - a
+    c1 = deepcopy(a)
+    @test mul!(c1, b, ctx) == a * b
+    d1 = deepcopy(a)
+    @test opp!(d1, ctx) == -a
+end
+
+@testset "TypeCoefficient: RingCoeffCtx - FpMPolyRingElem" begin
+    p = ZZ(2305843009213693951)
+    Fp = GF(p)
+    R, (x, y) = polynomial_ring(Fp, ["x", "y"])
+    ctx = RingCoeffCtx(R)
+    a = x + y + 1
+    b = x * y + Fp(2)
+    @test add(a, b, ctx) == a + b
+    @test sub(b, a, ctx) == b - a
+    @test opp(b, ctx) == -b
+    @test mul(a, b, ctx) == a * b
+    @test submul(a, b, a, ctx) == a - b * a
+    @test convert(9, ctx) == R(9)
+    @test convertn(-11, ctx) == R(-11)
+    @test normal(a, ctx) === a
+    @test inflate(b, ctx) === b
+    @test deflate(a, ctx) === a
+    a1 = deepcopy(a)
+    @test add!(a1, b, ctx) == a + b
+    b1 = deepcopy(b)
+    @test sub!(b1, a, ctx) == b - a
+    c1 = deepcopy(a)
+    @test mul!(c1, b, ctx) == a * b
+    d1 = deepcopy(a)
+    @test opp!(d1, ctx) == -a
+end

@@ -270,3 +270,49 @@ Base.zero(:: QQCtx) = QQ(0)
 
 Base.iszero(x :: QQFieldElem, :: QQCtx) = x == QQ(0)
 Base.isone(x :: QQFieldElem, :: QQCtx) = x == QQ(1)
+
+### polynomial and integer coefficient types
+
+const RingCoeff = Union{
+    fpPolyRingElem,
+    FpPolyRingElem,
+    ZZPolyRingElem,
+    fpMPolyRingElem,
+    FpMPolyRingElem,
+    ZZMPolyRingElem,
+    ZZRingElem,
+}
+
+struct RingCoeffCtx{T,R} <: NmodLikeΓ{T,T}
+    R :: R
+    char :: Int
+end
+
+RingCoeffCtx(R :: Ring) = RingCoeffCtx{elem_type(R), typeof(R)}(R, characteristic(R))
+
+opp(a :: T, :: RingCoeffCtx) where {T <: RingCoeff} = -a
+add(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a + b
+sub(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a - b
+mul(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a * b
+submul(a :: T, b :: T, c :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a - b * c
+
+opp!(a :: T, :: RingCoeffCtx) where {T <: RingCoeff} =  neg!(a,a)
+add!(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = Nemo.add!(a,a,b)
+sub!(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = Nemo.sub!(a,a,b)
+mul!(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = Nemo.mul!(a,a,b)
+
+
+
+normal(a :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a
+inflate(a :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a
+deflate(a :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a
+Base.convert(a :: Integer, ctx :: RingCoeffCtx{T}) where {T <: RingCoeff} = ctx.R(a)
+convertn(a :: Integer, ctx :: RingCoeffCtx{T}) where {T <: RingCoeff} = ctx.R(a)
+
+Base.one(ctx :: RingCoeffCtx) = ctx.R(1)
+Base.zero(::Type{T}, ctx :: RingCoeffCtx{T}) where {T <: RingCoeff} = ctx.R(0)
+Base.zero(ctx :: RingCoeffCtx) = ctx.R(0)
+
+Base.iszero(x :: T, :: RingCoeffCtx) where {T <: RingCoeff} = iszero(x)
+Base.isone(x :: T, :: RingCoeffCtx) where {T <: RingCoeff} = isone(x)
+
