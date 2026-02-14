@@ -6,3 +6,4 @@ debugfile.jl
 /profiling
 /.vscode
 /statprof/
+/my_test/

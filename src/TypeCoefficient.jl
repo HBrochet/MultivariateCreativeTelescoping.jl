@@ -271,48 +271,116 @@ Base.zero(:: QQCtx) = QQ(0)
 Base.iszero(x :: QQFieldElem, :: QQCtx) = x == QQ(0)
 Base.isone(x :: QQFieldElem, :: QQCtx) = x == QQ(1)
 
-### polynomial and integer coefficient types
 
-const RingCoeff = Union{
-    fpPolyRingElem,
-    FpPolyRingElem,
-    ZZPolyRingElem,
-    fpMPolyRingElem,
-    FpMPolyRingElem,
-    ZZMPolyRingElem,
-    ZZRingElem,
-}
+### Ring coefficients (for fraction-free algorithms)
 
-struct RingCoeffCtx{T,R} <: NmodLikeΓ{T,T}
-    R :: R
-    char :: Int
+abstract type RingCtx{T,Tbuf} <: AbsContextCoeff{T,Tbuf} end
+
+# Generic ring operations (no divisions)
+opp(a::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = -a
+add(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = a + b
+sub(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = a - b
+mul(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = a * b
+
+opp!(a::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Nemo.neg!(a, a)
+add!(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Nemo.add!(a, a, b)
+sub!(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Nemo.sub!(a, a, b)
+mul!(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Nemo.mul!(a, a, b)
+
+divexact!(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Nemo.divexact!(a, a, b)
+
+submul(a::T, b::T, c::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = a - b * c
+
+normal(a::Tbuf, ::RingCtx{T,Tbuf}) where {T,Tbuf} = a
+inflate(a::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = convert(Tbuf, a)
+deflate(a::Tbuf, ::RingCtx{T,Tbuf}) where {T,Tbuf} = convert(T, a)
+
+Base.gcd(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Base.gcd(a, b)
+
+
+function Base.inv(::Any, ::RingCtx{T,Tbuf}) where {T,Tbuf}
+    error("inv is not available over coefficient rings (fraction-free context).")
 end
 
-RingCoeffCtx(R :: Ring) = RingCoeffCtx{elem_type(R), typeof(R)}(R, characteristic(R))
+Base.zero(ctx::RingCtx{T,Tbuf}) where {T,Tbuf} = ctx.R(0)
+Base.one(ctx::RingCtx{T,Tbuf}) where {T,Tbuf} = ctx.R(1)
+Base.zero(::Type{T}, ctx::RingCtx{T,Tbuf}) where {T,Tbuf} = ctx.R(0)
+Base.one(::Type{T}, ctx::RingCtx{T,Tbuf}) where {T,Tbuf} = ctx.R(1)
+Base.iszero(x::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = iszero(x)
+Base.isone(x::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = isone(x)
 
-opp(a :: T, :: RingCoeffCtx) where {T <: RingCoeff} = -a
-add(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a + b
-sub(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a - b
-mul(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a * b
-submul(a :: T, b :: T, c :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a - b * c
-
-opp!(a :: T, :: RingCoeffCtx) where {T <: RingCoeff} =  neg!(a,a)
-add!(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = Nemo.add!(a,a,b)
-sub!(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = Nemo.sub!(a,a,b)
-mul!(a :: T, b :: T, :: RingCoeffCtx) where {T <: RingCoeff} = Nemo.mul!(a,a,b)
+Base.convert(a::Integer, ctx::RingCtx{T,Tbuf}) where {T,Tbuf} = ctx.R(a)
+convertn(a::Integer, ctx::RingCtx{T,Tbuf}) where {T,Tbuf} = ctx.R(a)
 
 
+## ZZ
 
-normal(a :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a
-inflate(a :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a
-deflate(a :: T, :: RingCoeffCtx) where {T <: RingCoeff} = a
-Base.convert(a :: Integer, ctx :: RingCoeffCtx{T}) where {T <: RingCoeff} = ctx.R(a)
-convertn(a :: Integer, ctx :: RingCoeffCtx{T}) where {T <: RingCoeff} = ctx.R(a)
+struct ZZCtx <: RingCtx{ZZRingElem,ZZRingElem}
+    R::ZZRing
+    char::Int
+    ZZCtx() = new(ZZ, 0)
+end
 
-Base.one(ctx :: RingCoeffCtx) = ctx.R(1)
-Base.zero(::Type{T}, ctx :: RingCoeffCtx{T}) where {T <: RingCoeff} = ctx.R(0)
-Base.zero(ctx :: RingCoeffCtx) = ctx.R(0)
+zz_ctx() = ZZCtx()
 
-Base.iszero(x :: T, :: RingCoeffCtx) where {T <: RingCoeff} = iszero(x)
-Base.isone(x :: T, :: RingCoeffCtx) where {T <: RingCoeff} = isone(x)
 
+## ZZ[x]
+
+struct ZZPolyCtx <: RingCtx{ZZPolyRingElem,ZZPolyRingElem}
+    R::ZZPolyRing
+    vars::Vector{ZZPolyRingElem}
+    char::Int
+    ZZPolyCtx(R, vars) = new(R, vars, 0)
+end
+
+function zzpoly_ctx(var::String = "x")
+    R, x = polynomial_ring(ZZ, var)
+    return ZZPolyCtx(R, [x])
+end
+
+
+## ZZ[x1,…,xn]
+
+struct ZZMPolyCtx <: RingCtx{ZZMPolyRingElem,ZZMPolyRingElem}
+    R::ZZMPolyRing
+    vars::Vector{ZZMPolyRingElem}
+    char::Int
+    ZZMPolyCtx(R, vars) = new(R, vars, 0)
+end
+
+function zzmpoly_ctx(vars::Vector{String} = ["x", "y"])
+    R, xs = polynomial_ring(ZZ, vars)
+    return ZZMPolyCtx(R, xs)
+end
+
+
+## Fp[x]  (small prime p; Nemo.Native.GF)
+
+struct fpPolyCtx <: RingCtx{fpPolyRingElem,fpPolyRingElem}
+    R::fpPolyRing
+    vars::Vector{fpPolyRingElem}
+    char::Int
+end
+
+function fppoly_ctx(p::Integer, var::String = "x")
+    pp = Int(p)
+    pp > 0 || error("p must be a positive prime")
+    R, x = polynomial_ring(Native.GF(pp), var)
+    return fpPolyCtx(R, [x], pp)
+end
+
+
+## Fp[x1,…,xn]  (small prime p; Nemo.Native.GF)
+
+struct fpMPolyCtx <: RingCtx{fpMPolyRingElem,fpMPolyRingElem}
+    R::fpMPolyRing
+    vars::Vector{fpMPolyRingElem}
+    char::Int
+end
+
+function fpmpoly_ctx(p::Integer, vars::Vector{String} = ["x", "y"])
+    pp = Int(p)
+    pp > 0 || error("p must be a positive prime")
+    R, xs = polynomial_ring(Native.GF(pp), vars)
+    return fpMPolyCtx(R, xs, pp)
+end
