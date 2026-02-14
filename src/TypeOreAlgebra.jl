@@ -124,14 +124,14 @@ function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars 
         if char > 0 
             S,vars = polynomial_ring(Native.GF(char),var)
             if fraction_free
-                return RingCoeffCtx(S)
+                return fpPolyCtx(S, [vars], char)
             end
             F = fraction_field(S)
             return UnivRatFunModpCtx(F,S,[vars],char)
         else 
             S,vars = polynomial_ring(ZZ,var)
             if fraction_free
-                return RingCoeffCtx(S)
+                return ZZPolyCtx(S, [vars])
             end
             F = fraction_field(S)
             return UnivRatFunQQCtx(F,S,[vars])
@@ -141,14 +141,14 @@ function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars 
         if char > 0 
             S,vars = polynomial_ring(Native.GF(char),vcat(ratdiffvars[1],ratvars))
             if fraction_free
-                return RingCoeffCtx(S)
+                return fpMPolyCtx(S, vars, char)
             end
             F = fraction_field(S)
             return RatFunModpCtx(F,S,vars,char)
         else 
             S,vars = polynomial_ring(ZZ,vcat(ratdiffvars[1],ratvars))
             if fraction_free
-                return RingCoeffCtx(S)
+                return ZZMPolyCtx(S, vars)
             end
             F = fraction_field(S)
             return RatFunQQCtx(F,S,vars)
@@ -158,7 +158,7 @@ function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars 
         if char > 0 
             return Nmod32Γ(char)
         elseif fraction_free 
-            return RingCoeffCtx(ZZ)
+            return ZZCtx()
         else
             return QQCtx()
         end
@@ -166,18 +166,21 @@ function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars 
 end
 
 coeff_vars(ctx :: RatFunCtx) = ctx.vars
-coeff_vars(ctx :: RingCoeffCtx) = collect(gens(ctx.R))
+coeff_vars(ctx :: ZZPolyCtx) = ctx.vars
+coeff_vars(ctx :: ZZMPolyCtx) = ctx.vars
+coeff_vars(ctx :: fpPolyCtx) = ctx.vars
+coeff_vars(ctx :: fpMPolyCtx) = ctx.vars
 
 coeff_vars(ctx ::QQCtx) = nothing
 coeff_vars(ctx ::Nmod32Γ) = nothing 
-coeff_vars(ctx ::RingCoeffCtx{ZZRingElem,ZZ}) = nothing
+coeff_vars(ctx ::ZZCtx) = nothing
 
 
 @inline function coeff_var(ctx :: RatFunCtx, vars, i :: Int)
     return ctx.F(vars[i])
 end
 
-@inline function coeff_var(:: RingCoeffCtx, vars, i :: Int)
+@inline function coeff_var(:: RingCtx, vars, i :: Int)
     return vars[i]
 end
 
@@ -397,6 +400,27 @@ function clear_denominators!(v :: Vector{OrePoly{T,M}}, A :: OreAlg) where {T,M}
     end
 end
 
+function content(p::OrePoly{T,M}, A::OreAlg{T,C,MA,O}) where {T,M,MA,O,C<:RingCtx{T,<:Any}}
+    isempty(p) && return one(ctx(A))
+    g = coeff(p, 1)
+    for i in 2:length(p)
+        g = gcd(g, coeff(p, i), ctx(A))
+        isone(g, ctx(A)) && break
+    end
+    return g
+end
+
+function primitive_part!(p::OrePoly{T,M}, A::OreAlg{T,C,MA,O}) where {T,M,MA,O,C<:RingCtx{T,<:Any}}
+    isempty(p) && return p
+    g = content(p, A)
+    isone(g, ctx(A)) && return p
+    cs = coeffs(p)
+    @inbounds for i in eachindex(cs)
+        divexact!(cs[i], g, ctx(A))
+    end
+    return p
+end
+
 
 function isholonomic(gb :: Vector{OrePoly{T,M}},A :: Alg) where {T,M, Alg <:OreAlg}
     #println("testing holonomy")
@@ -544,9 +568,6 @@ function unflatten(p :: OrePoly{T,K},A :: OreAlg) where {T,K}
     return res 
 end
  
-
-
-
 
 
 

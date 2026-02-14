@@ -43,9 +43,9 @@ end
     @test ctx(A_frac) isa UnivRatFunQQCtx
 
     A_poly = OreAlg(order = "lex x dx", ratvars = ["t"], poldiffvars = (["x"], ["dx"]), fraction_free = true)
-    @test ctx(A_poly) isa RingCoeffCtx
-    @test A_poly.ratvars["t"] == first(collect(gens(ctx(A_poly).R)))
+    @test ctx(A_poly) isa ZZPolyCtx
+    @test A_poly.ratvars["t"] == ctx(A_poly).vars[1]
 
      A_poly = OreAlg(order = "lex x dt dx", ratdiffvars = (["t"],["dt"]), poldiffvars = (["x"], ["dx"]), fraction_free = true)
-    @test ctx(A_poly) isa RingCoeffCtx
+    @test ctx(A_poly) isa ZZPolyCtx
 end
