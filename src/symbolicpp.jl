@@ -350,7 +350,11 @@ function f4matrix(A::alg,
             row = rows[p]
             lc = coeff(row, 1)
             if !isone(lc,ctx(A))
-                makemonic!(row,A)
+                if ctx(A) isa RingCtx
+                    primitive_part!(row, A)
+                else
+                    makemonic!(row, A)
+                end
             end
         end
     end

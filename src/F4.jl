@@ -165,7 +165,11 @@ function generatespairs!(pgb :: PartialGB{M,T}) where {M,T}
 
     for rel in pgb.newrels
         isempty(rel) && continue
-        makemonic!(rel,pgb.alg)
+        if ctx(pgb.alg) isa RingCtx
+            primitive_part!(rel, pgb.alg)
+        else
+            makemonic!(rel, pgb.alg)
+        end
         pushrel!(pgb, rel)
     end
     empty!(pgb.newrels)
@@ -179,7 +183,11 @@ function add_new_rels!(pgb :: PartialGB{M,T}) where {M,T}
         isempty(rel) && continue
         debug(pgb.param) && @debug "New relation with leading monomial $(mon(rel,1).exp)"
 
-        makemonic!(rel,pgb.alg)
+        if ctx(pgb.alg) isa RingCtx
+            primitive_part!(rel, pgb.alg)
+        else
+            makemonic!(rel, pgb.alg)
+        end
 
         push!(pgb.basis, rel)
         lmrel = mon(rel,1)
@@ -442,7 +450,11 @@ function Buchberger2(gens_ :: Vector{OrePoly{K,M}}, A :: Alg;param ::F4Param = f
         spol = div2!(spol,pgb.basis,A,param=param)
 
         if !iszero(spol)
-            makemonic!(spol,A)
+            if ctx(A) isa RingCtx
+                primitive_part!(spol, A)
+            else
+                makemonic!(spol, A)
+            end
             push!(pgb.newrels,spol) 
         end
 
