@@ -2,7 +2,9 @@ const RingF4Matrix{I, T, Tbuf} =
     F4Matrix{M,I,T,Alg} where {T,Tbuf,C <: RingCtx{T, Tbuf},M,O,Alg <:OreAlg{T,C,M,O}}
 
 function fillbuffer!(buffer::Vector{T}, row::OrePoly{T,I}, ctx::RingCtx{T,Tbuf}) where {T,Tbuf,I}
-    fill!(buffer, zero(T, ctx))
+    @inbounds for j in eachindex(buffer)
+        buffer[j] = zero(T, ctx)
+    end
     @inbounds for (c, j) in row
         buffer[j] = c
     end
@@ -26,7 +28,7 @@ end
 function scale_buffer!(ctx::RingCtx{T,Tbuf}, buffer::Vector{T}, mult::T) where {T,Tbuf}
     isone(mult, ctx) && return buffer
     @inbounds for j in eachindex(buffer)
-        buffer[j] = mul(mult, buffer[j], ctx)
+        mul!(buffer[j], mult, ctx)
     end
     return buffer
 end
@@ -45,7 +47,10 @@ function elementary_reduction_in_buffer(mx::RingF4Matrix{I, T, Tbuf},
     reducer = mx.rows[piv]
     pivco = coeff(reducer, 1)
 
-    scale_buffer!(ctxA, buffer, pivco)
+    gcd_ = gcd(pivco, c) 
+    co = divexact(c,gcd_,ctxA)
+
+    scale_buffer!(ctxA, buffer, divexact(pivco,gcd_,ctxA))
     buffer[j] = zero(T, ctxA)
 
     if stat(param)
@@ -53,10 +58,13 @@ function elementary_reduction_in_buffer(mx::RingF4Matrix{I, T, Tbuf},
         globalstats.counters[:f4_field_operations] += length(reducer)
     end
 
+
+    tmp = parent(co)()
     @inbounds for k in 2:length(reducer)
         m = mon(reducer, k)
         ck = coeff(reducer, k)
-        buffer[m] = submul(buffer[m], c, ck, ctxA)
+        Nemo.mul!(tmp,co,ck)
+        sub!(buffer[m], tmp, ctxA)
     end
     return true
 end
@@ -139,4 +147,3 @@ function reducenewpivots!(mx::RingF4Matrix{I, T, Tbuf}, param::F4Param) where {T
         mx.rows[mx.pivots[p]] = newrow
     end
 end
-

@@ -281,12 +281,13 @@ opp(a::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = -a
 add(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = a + b
 sub(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = a - b
 mul(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = a * b
+divexact(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Nemo.divexact(a, b)
+
 
 opp!(a::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Nemo.neg!(a, a)
 add!(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Nemo.add!(a, a, b)
 sub!(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Nemo.sub!(a, a, b)
 mul!(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Nemo.mul!(a, a, b)
-
 divexact!(a::T, b::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = Nemo.divexact!(a, a, b)
 
 submul(a::T, b::T, c::T, ::RingCtx{T,Tbuf}) where {T,Tbuf} = a - b * c
