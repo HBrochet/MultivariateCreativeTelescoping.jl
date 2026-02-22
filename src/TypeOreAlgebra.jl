@@ -373,16 +373,16 @@ function diff(pol_ :: OrePoly, ind_ :: Integer, A ::OreAlg)
 end
 
 
-function denominator(p :: OrePoly,A:: OreAlg)
+function denominator(p :: OrePoly, A:: OreAlg; normalize::Val{B} = Val(true)) where {B}
     if length(p) == 0 
         return ctx(A).R(1)
     end
-    return lcm([Nemo.denominator(c,false) for c in coeffs(p)])
+    return lcm([Nemo.denominator(c, B) for c in coeffs(p)])
 end
 
-function denominator(p :: OrePoly)
+function denominator(p :: OrePoly; normalize::Val{B} = Val(true)) where {B}
     # it assumes lengtp(p) > 0
-    return lcm([Nemo.denominator(c,false) for c in coeffs(p)])
+    return lcm([Nemo.denominator(c, B) for c in coeffs(p)])
 end
 
 function clear_denominators!(p :: OrePoly, A :: OreAlg)

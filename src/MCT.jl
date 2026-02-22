@@ -1,5 +1,5 @@
 
-function MCT_internal(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg,param :: MCTParam) where {T,M}
+function MCT_internal(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, A::OreAlg{T,C,M,O}, param :: MCTParam) where {T,C,M,O}
     push!(A.nomul,1)
     par = ci_param(comp = Val(:fast), same_den = Val(false))
     der_map, spol = compute_with_cauchy_interpolation(der_red_map, A, spol, gb,param,param=par)
@@ -10,9 +10,45 @@ function MCT_internal(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg,par
 end
 
 """
+    MCT_direct(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg; param :: MCTParam = mct_param())
+
+Compute MCT directly over the current coefficient field, without CRT or Cauchy interpolation.
+"""
+function MCT_direct(spol :: OrePoly{T,M}, _gb :: Vector{OrePoly{T,M}}, A::OreAlg{T,C,M,O}; param :: MCTParam = mct_param()) where {T,C,M,O}
+    push!(A.nomul,1)
+    gb = deepcopy(_gb)
+    der_map, spol = der_red_map(A, spol, gb, param)
+    debug(param) && @debug "der_red_map computed directly, starting to compute the LDE"
+    deleteat!(A.nomul, length(A.nomul))
+    return find_LDE_direct(der_map, spol, A)
+end
+
+function MCT_direct(A::OreAlg{T,C,M,O}, spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}; param :: MCTParam = mct_param()) where {T,C,M,O}
+    return MCT_direct(spol, gb, A; param = param)
+end
+
+"""
+    MCT_direct_nofrac(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg; param :: MCTParam = mct_param())
+
+Compute MCT directly over the current coefficient field, without fraction-free processing
+for finding the LDE.
+"""
+function MCT_direct_nofrac(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, A::OreAlg{T,C,M,O}; param :: MCTParam = mct_param()) where {T,C,M,O}
+    push!(A.nomul,1)
+    der_map, spol = der_red_map(A, spol, gb, param)
+    debug(param) && @debug "der_red_map computed directly (no fraction-free LDE), starting to compute the LDE"
+    deleteat!(A.nomul, length(A.nomul))
+    return find_LDE_direct_nofrac(der_map, spol, A)
+end
+
+function MCT_direct_nofrac(A::OreAlg{T,C,M,O}, spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}; param :: MCTParam = mct_param()) where {T,C,M,O}
+    return MCT_direct_nofrac(spol, gb, A; param = param)
+end
+
+"""
     MCT(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg) where {T,M}
 """
-function MCT(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg;param :: MCTParam = mct_param()) where {T,M}
+function MCT(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, A::OreAlg{T,C,M,O};param :: MCTParam = mct_param()) where {T,C,M,O}
     if char(A) > 0 
         return MCT_internal(spol,gb,A,param)
     else
@@ -20,7 +56,7 @@ function MCT(spol :: OrePoly, gb :: Vector{OrePoly{T,M}}, A::OreAlg;param :: MCT
     end
 end
 
-function MCT(A::OreAlg, spol :: OrePoly, gb :: Vector{OrePoly{T,M}}; param :: MCTParam = mct_param()) where {T,M}
+function MCT(A::OreAlg{T,C,M,O}, spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}; param :: MCTParam = mct_param()) where {T,C,M,O}
     return MCT(spol,gb,A;param = param)
 end
 
@@ -31,11 +67,45 @@ end
 function find_LDE_by_interpolation(der_map :: Dict{M,OrePoly{T,M}}, spol :: OrePoly{T,M}, A :: OreAlg) where {T,M}
     rels, den = find_first_lin_dep_derivatives(der_map,spol,A)
     mat = mct_op_to_mat(rels, A)
-    par = ci_param(;denisone=Val(true), comp = Val(:fast),same_den=Val(true))
+    par = ci_param(;denisone=Val(true), comp = Val(:fast),same_den=Val(false))
     res = compute_with_cauchy_interpolation(my_kernel,A,mat,param=par)
     for i in 1:length(res)
         coeffs(res)[i] = coeffs(res)[i] * ctx(A).F(den)^(mons(res)[i][1]+1)
+    end 
+    clear_denominators!(res,A)
+    ngcd = gcd([Nemo.numerator(c,false) for c in coeffs(res)])
+    mul!(1 // ctx(A).F(ngcd), res, A)
+    return res
+end
+
+function find_LDE_direct(der_map :: Dict{M,OrePoly{T,M}}, spol :: OrePoly{T,M}, A :: OreAlg) where {T,M}
+    den = denominator(spol, A; normalize = Val(true))
+    for v in values(der_map)
+        den = lcm(den,denominator(v, A; normalize = Val(true)))
     end
+    Fden = ctx(A).F(den)
+    for v in values(der_map)
+        mul!(Fden,v,A)
+    end
+    mul!(Fden,spol,A)
+
+    nrels = 1 + length(der_map)
+    rels = Vector{OrePoly{T,M}}(undef,nrels)
+    rels[1] = spol
+    nrel = spol
+    ord = 0
+    for i in 2:nrels
+        nrel = compute_next_rel(der_map, nrel, den, ord, A)
+        rels[i] = nrel
+        ord += 1
+    end
+
+    mat = mct_op_to_mat(rels, A)
+    res = my_kernel(A, mat)
+    for i in 1:length(res)
+        coeffs(res)[i] = coeffs(res)[i] * Fden^(mons(res)[i][1]+1)
+    end
+
     clear_denominators!(res,A)
     ngcd = gcd([Nemo.numerator(c,false) for c in coeffs(res)])
     mul!(1 // ctx(A).F(ngcd), res, A)
@@ -91,23 +161,23 @@ function find_first_lin_dep_derivatives(map_ :: Dict{M,OrePoly{T,M}}, spol :: Or
             return rels, Fden
         end
         add_echelon!(echelon_derivatives, nrel_red, nA, augmented = true, echelonvect = echelonvect, vect = v)
-        nrel = compute_next_rel(map_, nrel,Fden,ord,A)
+        nrel = compute_next_rel(map_, nrel, den, ord, A)
         ord += 1 
     end
 end
 
 
-function compute_next_rel(map_ :: Dict{M,OrePoly{T,M}}, pol :: OrePoly{T,M},den ::T,ord::Int, A :: OreAlg) where {T,M}
+function compute_next_rel(map_ :: Dict{M,OrePoly{T,M}}, pol :: OrePoly{T,M}, den :: S, ord::Int, A :: OreAlg) where {T,M,S}
     cs = deepcopy(coeffs(pol))
     ms = deepcopy(mons(pol))
     for i in 1:length(cs)
-        cs[i] = ctx(A).F(derivative(Nemo.numerator(cs[i],false))*den)
+        cs[i] = ctx(A).F(derivative(Nemo.numerator(cs[i],true))*den)
     end
     res = OrePoly(cs,ms)
     normalize!(res,A)
-    if den != one(ctx(A))
+    if !isone(den)
         cpol = deepcopy(pol)
-        mul!(ctx(A).F(ord+1)*derivative(den),cpol,A)
+        mul!(ctx(A).F(ord+1)*ctx(A).F(derivative(den)),cpol,A)
         res = sub!(res,cpol,A)
     end
     for (c,m) in pol 
@@ -115,6 +185,7 @@ function compute_next_rel(map_ :: Dict{M,OrePoly{T,M}}, pol :: OrePoly{T,M},den 
     end
     return res 
 end
+
 
 function  line_mat_to_orepoly(line_mat ::Nemo.fpMatrix, A :: OreAlg)
     l = number_of_columns(line_mat)
@@ -127,6 +198,16 @@ function  line_mat_to_orepoly(line_mat ::Nemo.fpMatrix, A :: OreAlg)
 end
 
 function  line_mat_to_orepoly(line_mat ::Generic.MatSpaceElem{Generic.FracFieldElem{Nemo.fpPolyRingElem}}, A :: OreAlg)
+    l = number_of_columns(line_mat)
+    res = undefOrePoly(l,A)
+    for i in l:-1:1
+        res[l-i+1] = (line_mat[1,i], makemon(1,A)^(i-1))
+    end
+    normalize!(res,A)
+    return res
+end
+
+function  line_mat_to_orepoly(line_mat ::Generic.MatSpaceElem{Generic.FracFieldElem{Nemo.ZZPolyRingElem}}, A :: OreAlg)
     l = number_of_columns(line_mat)
     res = undefOrePoly(l,A)
     for i in l:-1:1

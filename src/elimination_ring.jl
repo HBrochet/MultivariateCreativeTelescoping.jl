@@ -103,7 +103,7 @@ function reduce!(mx::RingF4Matrix{I, T, Tbuf}, param::F4Param) where {T,Tbuf,I}
             mx.rows[i] = OrePoly(T[], I[])
         end
     end
-    return
+    return nothing
 end
 
 function reducepivots!(mx::RingF4Matrix{I, T, Tbuf}, param::F4Param) where {T,Tbuf,I}
@@ -146,4 +146,5 @@ function reducenewpivots!(mx::RingF4Matrix{I, T, Tbuf}, param::F4Param) where {T
         primitive_part!(newrow, mx.A)
         mx.rows[mx.pivots[p]] = newrow
     end
+    return nothing
 end

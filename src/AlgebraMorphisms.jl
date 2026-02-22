@@ -221,7 +221,7 @@ end
 
 
 function change_coefficient_field(R :: Ring,A :: OreAlg, args...)
-    return (change_coefficient_field(R,arg,A) for arg in args)
+    return map(arg -> change_coefficient_field(R,arg,A), args)
 end
 
 function change_coefficient_field(:: Ring, vA ::OreAlg, A ::OreAlg)
@@ -231,7 +231,7 @@ end
 
 # change coefficient field from QQ to modp 
 function change_coefficient_field(A :: OreAlg, args...)
-    return (change_coefficient_field(arg,A) for arg in args)
+    return map(arg -> change_coefficient_field(arg,A), args)
 end
 
 function change_coefficient_field(vA ::OreAlg, A ::OreAlg)
@@ -531,11 +531,11 @@ end
 # end
 
 function evaluate_parameter(p ::Int, ind :: Int, A :: OreAlg, args...)
-    return (evaluate_parameter(arg,p,ind,A) for arg in args)
+    return map(arg -> evaluate_parameter(arg,p,ind,A), args)
 end
 
 function evaluate_parameter(p ::Int, A :: OreAlg, args...)
-    return (evaluate_parameter(arg,p,1,A) for arg in args)
+    return map(arg -> evaluate_parameter(arg,p,1,A), args)
 end
 
 function evaluate_parameter_cbl(cbl :: UnivRatFunModp ,randpoints :: Vector{Int},A :: OreAlg)
@@ -579,6 +579,7 @@ function new_rand_points(vec :: Vector{Int}, p :: Int,len :: Int)
     res = Int[]
     while l<len  
         point = mod(rand(Int),p)
+        # point = p - 10000 - length(res)
         if !(point in vec) && !(point in res)
             push!(res,point)
             l += 1
@@ -703,4 +704,3 @@ end
 # function evaluate_parameter(a :: Any,:: Int,:: OreAlg)
 #     return a 
 # end
-

@@ -1,5 +1,6 @@
-
 struct CIParam{A,B,C,D} end 
+
+CIParam{A,B,C,D}(::Val{A}, ::Val{B}, ::Val{C}, ::Val{D}) where {A,B,C,D} = CIParam{A,B,C,D}()
 
 function ci_param(;denisone :: Val{A} = Val(false),
                   tracer :: Val{B} = Val(false),
@@ -13,44 +14,91 @@ tracer(p :: CIParam{A,B,C,D}) where {A,B,C,D} = B
 comp(p :: CIParam{A,B,C,D}) where {A,B,C,D} = C
 same_den(p :: CIParam{A,B,C,D}) where {A,B,C,D} = D
 
+# keep only evaluations with majority support signature
+@inline function _recompute_prd(randpoints::Vector{Int}, t, A::OreAlg)
+    prd = t - randpoints[1]
+    ctxA = ctx(A)
+    @inbounds for i in 2:length(randpoints)
+        prd = prd * (t - randpoints[i])
+    end
+    return prd
+end
+
+@inline _ci_bnd_init(comp::Symbol, bound::Int) =
+    comp == :fast ? 2^bound + 1 : comp == :medium ? bound^2 + 1 : bound + 1
+
+@inline _ci_bnd_next(comp::Symbol, bound::Int, bnd::Int) =
+    comp == :fast ? 2^bound + 1 : comp == :medium ? bound^2 + 1 : bnd + 2
+
+@inline function _ci_eval_args_at(vctr::Int, vargs, nargs::Int)
+    return ntuple(nargs) do i
+        vargs[i][vctr]
+    end
+end
+
 # It assumes that A has only one parameter
 # the function f should be called as f(ev(A), ev(arg1...),arg2) where ev evaluates the parameter
 function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;param ::CIParam = ci_param())
-    let ev_args;
     randpoints = Int[]
     npoints = 1
     bound = 1 
-    if comp(param) == :fast 
-        bnd = 2^bound + 1
-    elseif comp(param) == :medium 
-        bnd = bound^2 + 1
-    else # comp(param) = :slow 
-        bnd = bound + 1
-    end
+    bnd = _ci_bnd_init(comp(param), bound)
     succeeded = false
-    globalstats.counters[:number_evaluation] += 1
 
-    let prev_cbl
-    let prev_res
+
+    local prev_cbl
+    local prev_res
 
     glen = guess_length(args...)
+    nargs = length(args)
     nA = evaluate_parameter_algebra(1,A) # first argument is not needed unless there are variables T in A
     vpoints, vargs = evaluate_parameter_many(glen,randpoints,nA,args...;denisone=Val(denisone(param)))
-    let vargs = vargs
-        ev_args =ntuple(length(args)) do i
-            vargs[i][1]
-    end; end 
+    vctr = 1
+    t = ctx(A).vars[1]
+
     if tracer(param)
+        # println("tracer in")
+        if vcr > glen
+            vpoints, vargs = evaluate_parameter_many(glen,randpoints,nA,args...;denisone=Val(denisone(param)))
+            vctr = 1
+        end
+        ev_args = _ci_eval_args_at(vctr, vargs, nargs)
         tmp, trace = f(nA,ev_args...;tracer=Val(true))
         ev_res = [tmp]
+        tab_tr = [trace]
+        push!(randpoints, vpoints[vctr])
+        prd = t - vpoints[vctr]
+        vctr += 1
+        globalstats.counters[:number_evaluation] += 1
+        for _ in 2:3
+            if vctr > glen
+                vpoints, vargs = evaluate_parameter_many(glen,randpoints,nA,args...;denisone=Val(denisone(param)))
+                vctr = 1
+            end
+            ev_args = _ci_eval_args_at(vctr, vargs, nargs)
+            tmp, trace = f(nA,ev_args...;tracer=Val(true))
+            push!(ev_res, tmp)
+            push!(tab_tr, trace)
+            push!(randpoints, vpoints[vctr])
+            prd *= (t - vpoints[vctr])
+            vctr += 1
+            globalstats.counters[:number_evaluation] += 1
+        end
+        majority_test!(tab_tr,[1,2,3], A)
+        if length(tab_tr) < 2 
+            error("too many bad points")
+        end
+        trace = tab_tr[1]
+        npoints = 3
     else 
+        # println("trace off")
+        ev_args = _ci_eval_args_at(1, vargs, nargs)
         ev_res = [f(nA,ev_args...)]
+        vctr += 1
+        push!(randpoints,vpoints[1])
+        globalstats.counters[:number_evaluation] += 1
+        prd = t - vpoints[1] # product of the t-randpoints[i], precomputation for cauchy interpolation
     end
-    vctr = 2 
-    push!(randpoints,vpoints[1])
-    # globalstats.counters[:number_evaluation] += 1
-    t = ctx(A).vars[1]
-    prd = t - vpoints[1] # product of the t-randpoints[i], precomputation for cauchy interpolation
 
 
     while true 
@@ -59,18 +107,14 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;p
             vctr = 1
         end
         push!(randpoints,vpoints[vctr])
-        let vargs = vargs; let vctr = vctr
-            ev_args =ntuple(length(args)) do i
-                vargs[i][vctr]
-        end; end; end
+        ev_args = _ci_eval_args_at(vctr, vargs, nargs)
         prd = prd*(t-vpoints[vctr])
         vctr +=1
         npoints += 1 
 
         globalstats.counters[:number_evaluation] += 1
+        @debug "evaluation of t at a point ($(npoints)th)" 
 
-        # globalstats.counters[:number_evaluation] += 1
-        # @debug "evaluation of t at a point ($(npoints)th)" 
         if tracer(param)
             re = f(nA,trace,ev_args...)
         else
@@ -82,9 +126,16 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;p
 
         if succeeded 
             # @debug "interpolation to reconstruct stable mon set"
+            majority_test!(ev_res, randpoints, A)
+            prd = _recompute_prd(randpoints, t, A)
             if same_den(param)
+                # println("try same den")
                 rcbl = random_cbl(ev_res,nA)
                 cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
+
+                # println("succeed 2")
+                # println(Nemo.denominator(cbl,false))
+                # println(Nemo.denominator(prev_cbl,false))
                 if Nemo.denominator(cbl,false) == Nemo.denominator(prev_cbl,false)
                     ev_den = evaluate_parameter_cbl(cbl,randpoints,A)
                     den = Nemo.denominator(cbl,false)
@@ -96,47 +147,45 @@ function compute_with_cauchy_interpolation(f :: Function, A :: OreAlg, args...;p
                 if res == prev_res 
                     return res 
                 end
+                prev_res = res
             end
-            # @debug "reconstructions don't match, trying another point"
+            @debug "reconstructions don't match, trying another point"
             succeeded = false
         elseif npoints == bnd
             try 
-                # @debug "interpolation to reconstruct stable mon set"
+                @debug "trying reconstruction with Cauchy interpolation"
+                majority_test!(ev_res, randpoints, A)
+                prd = _recompute_prd(randpoints, t, A)
                 if same_den(param)
                     rcbl = random_cbl(ev_res,nA)
                     prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
-                else 
+                    # println("succeed 1")
+                    # println(prev_cbl)
+                else    
                     prev_res = cauchy_interpolation(ev_res,randpoints, A;prd = prd)
                 end
                 succeeded = true
-                # @debug "success, trying one more point"
+                @debug "success, trying one more point"
             catch 
-                # @debug "failure, trying more points"
+                @debug "failure, trying more points"
             end 
             bound += 1
-            if comp(param) == :fast 
-                bnd = 2^bound + 1
-            elseif comp(param) == :medium 
-                bnd = bound^2 + 1
-            else # comp(param) = :slow 
-                bnd += 2
-            end
+            bnd = _ci_bnd_next(comp(param), bound, bnd)
         end
-        # if npoints ==100
+        # if npoints ==1000
+        #     majority_test!(ev_res, randpoints, A)
+        #     prd = _recompute_prd(randpoints, t, A)
         #     if same_den(param)
         #         rcbl = random_cbl(ev_res,nA)
         #         prev_cbl = cauchy_interpolation(rcbl,randpoints, A;prd = prd)
-        #         println("random cbl")
-        #         println(prev_cbl)
+        #         # println("succeed 100")
+        #         # println(prev_cbl)
         #     else 
         #         prev_res = cauchy_interpolation(ev_res,randpoints, A;prd = prd)
         #     end
         #     error("fin")
         # end
     end
-    end
-    end
-end
 end
 
 
@@ -453,7 +502,7 @@ function cauchy_interpolation_naive(S::PolyRing,var ::TT, x::Vector{T}, y::Vecto
     error("Cauchy interpolation has no solution")
 end
 # see algorithmes efficaces en calcul formel
-function half_gcd(A :: fpPolyRingElem, B :: fpPolyRingElem)
+function half_gcd_julia(A :: fpPolyRingElem, B :: fpPolyRingElem)
     R = parent(A)
     n = Nemo.degree(A)
     n2 = Nemo.degree(B)
@@ -464,7 +513,7 @@ function half_gcd(A :: fpPolyRingElem, B :: fpPolyRingElem)
 
     f = R(collect(coefficients(A))[m+1:end])
     g = R(collect(coefficients(B))[m+1:end])
-    M = half_gcd(f,g)
+    M = half_gcd_julia(f,g)
 
     Ap,Bp = M*SVector{2,fpPolyRingElem}(A,B)
     if Nemo.degree(Bp) < m 
@@ -475,8 +524,12 @@ function half_gcd(A :: fpPolyRingElem, B :: fpPolyRingElem)
     l = 2*m-Nemo.degree(Bp)
     b = R(collect(coefficients(Bp))[l+1:end])
     c = R(collect(coefficients(Cp))[l+1:end])
-    Mpp = half_gcd(b,c)
+    Mpp = half_gcd_julia(b,c)
     return Mpp*Mp*M
+end
+
+function half_gcd(A :: fpPolyRingElem, B :: fpPolyRingElem)
+    return half_gcd_flint(A, B)
 end
 
 # returns the first matrix st M(p,q) = (R1,R2) with deg(R1) >= l and deg(R2) < l
@@ -486,7 +539,7 @@ function mat_gcd_remainder_with_degree_cond(p :: fpPolyRingElem, q :: fpPolyRing
     R = parent(p)
 
     if Nemo.degree(q) < l  
-        return SMatrix{2,2,fpPolyRingElem}([R(1),R(0),R(0),R(1)])
+        return SMatrix{2,2,fpPolyRingElem}(R(1),R(0),R(0),R(1))
     elseif l <= div(n,2)
         M = half_gcd(p,q)
         (pp,qq) = M*v
@@ -496,7 +549,7 @@ function mat_gcd_remainder_with_degree_cond(p :: fpPolyRingElem, q :: fpPolyRing
             # do one step here
            quo,r = divrem(pp,qq)
            pp, qq = qq, r
-           M = SMatrix{2,2,fpPolyRingElem}([R(0),R(1),R(1),-quo])*M
+           M = SMatrix{2,2,fpPolyRingElem}(R(0),R(1),R(1),-quo)*M
         end
         Mrec= mat_gcd_remainder_with_degree_cond(pp,qq,l)
         return Mrec*M

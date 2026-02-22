@@ -124,7 +124,7 @@ function reduce!(mx::NmodF4Matrix{I, T, Tbuf},param :: F4Param) where {T, Tbuf, 
             mx.rows[i] = OrePoly(T[],I[])
         end
     end
-    return
+    return nothing
 end
 
 
@@ -162,5 +162,6 @@ function reducenewpivots!(mx :: NmodF4Matrix{I, T, Tbuf},param :: F4Param) where
         end
         mx.rows[mx.pivots[p]] = savebuffer!(ctx(mx.A), buffer, row, p, false)
     end
+    return nothing
 end
 
