@@ -454,7 +454,7 @@ function evaluate_coeff(pol :: OrePoly, v :: Vector{K}, A :: OreAlg) where K
     nc = Vector{eltype_co(A)}(undef,len)
     ct = ctx(A)
     for i in 1:len 
-        nc[i] = convertn(evaluate(cos[i],v).data,ct)
+        nc[i] = convertn(evaluate(cos[i], v), ct)
     end
     return OrePoly(nc,mons(pol))
 end

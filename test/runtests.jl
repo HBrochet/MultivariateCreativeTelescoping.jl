@@ -8,8 +8,16 @@ include("typemonorder.jl")
 include("typeorealgebra.jl")
 include("parseinputoutput.jl")
 include("orepolyaddmul.jl")
-include("crt.jl")
-include("cauchy_interpolation.jl")
+
+# dfinite parser 
+include("dfinite_parser.jl")
+include("ann_poly_power.jl")
+include("ann_comp_right_rat.jl")
+include("ann_comp_right_alg.jl")
+include("minimal_polynomial.jl")
+
+# include("crt.jl")
+# include("cauchy_interpolation.jl")
 
 @testset "unused type" begin
     @test isempty(detect_unbound_args(MultivariateCreativeTelescoping)) 

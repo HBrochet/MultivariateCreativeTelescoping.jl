@@ -61,10 +61,12 @@ function create_order(A :: Vector{Vector{I}},::Val{M}) where {M <: AbsOreMonomia
     prog = "function lt(order :: $(namestruct), a :: OreMonVE, b :: OreMonVE)\n"
 
     for i in 1:length(A)
+        sum_a = join(["+ a[$(j)]*Int16($(B[i,j]))" for j in 1:N], "")
+        sum_b = join(["+ b[$(j)]*Int16($(B[i,j]))" for j in 1:N], "")
         prog *= "t1 = Int16(0)"
-        prog *= prod("+ a[$(j)]*Int16($(B[i,j]))" for j in 1:N)
+        prog *= sum_a
         prog *= "\nt2 = Int16(0)"
-        prog *= prod("+ b[$(j)]*Int16($(B[i,j]))" for j in 1:N)
+        prog *= sum_b
         prog *= "\nif t1 < t2 
         return true
     elseif t1 > t2 
@@ -74,7 +76,8 @@ function create_order(A :: Vector{Vector{I}},::Val{M}) where {M <: AbsOreMonomia
     prog *= "return false\n end"
 
     prog2 = "function max_deg_block(order :: $(namestruct), a :: OreMonVE)\n"
-    prog2 *= "v = SVector{$(N),Int16}("*prod("Int16($(B[1,i])), " for i in 1:N-1)*"Int16($(B[1,N])))\n"
+    vprefix = join(["Int16($(B[1,i])), " for i in 1:N-1], "")
+    prog2 *= "v = SVector{$(N),Int16}("*vprefix*"Int16($(B[1,N])))\n"
     prog2 *= "return Int(sum(a.exp.*v))\nend"
     eval(Meta.parse(prog))
     eval(Meta.parse(prog2))

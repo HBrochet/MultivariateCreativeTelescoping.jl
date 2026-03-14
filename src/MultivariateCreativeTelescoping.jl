@@ -30,6 +30,7 @@ include("Buchberger.jl")
 
 include("symbolicpp.jl")
 include("elimination.jl")
+include("fglm.jl")
 include("F4.jl")
 
 
@@ -49,7 +50,15 @@ include("CRT.jl")
 include("CauchyInterpolation.jl")
 
 include("annfs.jl")
-include("ann_sum_prod.jl")
+include("dfinite_parser/database_LDE.jl")
+include("dfinite_parser/ann_sum_prod.jl")
+include("dfinite_parser/minimal_polynomial.jl")
+include("dfinite_parser/dfinite_algebraic_leaf.jl")
+include("dfinite_parser/ann_comp_right_rat.jl")
+include("dfinite_parser/ann_comp_right_alg.jl")
+include("dfinite_parser/dfinite_hyperexp_division.jl")
+include("dfinite_parser/ann_poly_power.jl")
+include("dfinite_parser/dfinite_parser.jl")
 include("testfunctions.jl")
 # include("IndicialEqs.jl")
 
