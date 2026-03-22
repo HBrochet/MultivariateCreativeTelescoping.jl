@@ -1,9 +1,23 @@
 abstract type AbsMonomialOrder{N} <: Base.Order.Ordering end
 
-const MONOMIAL_ORDER_CACHE = Dict{Any, Any}()
+struct GeneratedMonomialOrder{N,R,C,B} <: AbsMonomialOrder{N} end
+
+@inline function _order_weight_at(B::Tuple, R::Int, i::Int, j::Int)
+    return B[(j - 1) * R + i]
+end
+
+function order_weight_matrix(A :: Vector{Vector{I}}, ::Val{M}) where {I <: Integer, M <: AbsOreMonomial}
+    R = length(A)
+    C = nvars(M)
+    data = ntuple(k -> begin
+        i = (k - 1) % R + 1
+        j = (k - 1) ÷ R + 1
+        Int16(A[i][j])
+    end, R * C)
+    return SMatrix{R,C,Int16,R*C}(data)
+end
 
 nvars(:: AbsMonomialOrder{N}) where N = N
-struct EmptyMORD{N} <: AbsMonomialOrder{N} end
 
 function  Base.Order.lt(ord :: AbsMonomialOrder, a::Tuple{K, M}, b :: Tuple{K, M}) where {K, M <: AbsOreMonomial}
     return lt(ord, a[2], b[2])
@@ -57,41 +71,37 @@ end
 
 function create_order(A :: Vector{Vector{I}},::Val{M}) where {M <: AbsOreMonomial,I <: Integer}
     N = nvars(M)
-    B = adjoint(SMatrix{nvars(M),length(A)}( collect(Iterators.flatten(A))))
-    key = (M, size(B, 1), size(B, 2), Tuple(Int.(B)))
-    cached = get(MONOMIAL_ORDER_CACHE, key, nothing)
-    cached === nothing || return cached
+    B = order_weight_matrix(A, Val(M))
+    return GeneratedMonomialOrder{N,size(B, 1),size(B, 2),Tuple(B)}()
+end
 
-    namestruct = Symbol("Order",ord_ctr)
-    eval(Meta.parse("struct $(namestruct) <: AbsMonomialOrder{$(N)} end"))
-    prog = "function lt(order :: $(namestruct), a :: OreMonVE, b :: OreMonVE)\n"
-
-    for i in 1:length(A)
-        sum_a = join(["+ a[$(j)]*Int16($(B[i,j]))" for j in 1:N], "")
-        sum_b = join(["+ b[$(j)]*Int16($(B[i,j]))" for j in 1:N], "")
-        prog *= "t1 = Int16(0)"
-        prog *= sum_a
-        prog *= "\nt2 = Int16(0)"
-        prog *= sum_b
-        prog *= "\nif t1 < t2 
-        return true
-    elseif t1 > t2 
-        return false
-    end\n"
+@generated function lt(::GeneratedMonomialOrder{N,R,C,B}, a :: OreMonVE{N,E}, b :: OreMonVE{N,E}) where {N,R,C,B,E <: Integer}
+    rows = Any[]
+    for i in 1:R
+        terms_a = [:(t1 += a[$j] * Int16($(_order_weight_at(B, R, i, j)))) for j in 1:C if _order_weight_at(B, R, i, j) != 0]
+        terms_b = [:(t2 += b[$j] * Int16($(_order_weight_at(B, R, i, j)))) for j in 1:C if _order_weight_at(B, R, i, j) != 0]
+        push!(rows, quote
+            t1 = Int16(0)
+            $(terms_a...)
+            t2 = Int16(0)
+            $(terms_b...)
+            if t1 < t2
+                return true
+            elseif t1 > t2
+                return false
+            end
+        end)
     end
-    prog *= "return false\n end"
+    return Expr(:block, rows..., :(return false))
+end
 
-    prog2 = "function max_deg_block(order :: $(namestruct), a :: OreMonVE)\n"
-    vprefix = join(["Int16($(B[1,i])), " for i in 1:N-1], "")
-    prog2 *= "v = SVector{$(N),Int16}("*vprefix*"Int16($(B[1,N])))\n"
-    prog2 *= "return Int(sum(a.exp.*v))\nend"
-    eval(Meta.parse(prog))
-    eval(Meta.parse(prog2))
-
-    global ord_ctr += 1
-    ord = eval(Meta.parse("$(namestruct)()"))
-    MONOMIAL_ORDER_CACHE[key] = ord
-    return ord
+@generated function max_deg_block(::GeneratedMonomialOrder{N,R,C,B}, a :: OreMonVE{N,E}) where {N,R,C,B,E <: Integer}
+    terms = [:(acc += a[$j] * Int16($(_order_weight_at(B, R, 1, j)))) for j in 1:C if _order_weight_at(B, R, 1, j) != 0]
+    return quote
+        acc = Int16(0)
+        $(terms...)
+        return Int(acc)
+    end
 end
 
 

@@ -569,6 +569,3 @@ function unflatten(p :: OrePoly{T,K},A :: OreAlg) where {T,K}
 end
  
 
-
-
-

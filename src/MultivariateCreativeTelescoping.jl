@@ -8,8 +8,6 @@ using ExportAll
 
 using FLINT_jll: libflint
 
-global ord_ctr = 0; # used to create new types with metaprogramming
-
 include("globalstats.jl")
 include("primes.jl")
 include("DataStructure_missing.jl")

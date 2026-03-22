@@ -36,6 +36,9 @@ using MultivariateCreativeTelescoping
     undef = @inferred undefOrePoly(2, A)
     @test length(undef.coeffs) == 2
     @test length(undef.mons) == 2
+
+    A_copy = OreAlg(deepcopy(A.inp))
+    @test typeof(order(A_copy)) === typeof(order(A))
 end
 
 @testset "TypeOreAlgebra fraction-free coefficients" begin
