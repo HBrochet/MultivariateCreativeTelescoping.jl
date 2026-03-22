@@ -1,5 +1,7 @@
 abstract type AbsMonomialOrder{N} <: Base.Order.Ordering end
 
+const MONOMIAL_ORDER_CACHE = Dict{Any, Any}()
+
 nvars(:: AbsMonomialOrder{N}) where N = N
 struct EmptyMORD{N} <: AbsMonomialOrder{N} end
 
@@ -55,8 +57,12 @@ end
 
 function create_order(A :: Vector{Vector{I}},::Val{M}) where {M <: AbsOreMonomial,I <: Integer}
     N = nvars(M)
-    namestruct = Symbol("Order",ord_ctr)
     B = adjoint(SMatrix{nvars(M),length(A)}( collect(Iterators.flatten(A))))
+    key = (M, size(B, 1), size(B, 2), Tuple(Int.(B)))
+    cached = get(MONOMIAL_ORDER_CACHE, key, nothing)
+    cached === nothing || return cached
+
+    namestruct = Symbol("Order",ord_ctr)
     eval(Meta.parse("struct $(namestruct) <: AbsMonomialOrder{$(N)} end"))
     prog = "function lt(order :: $(namestruct), a :: OreMonVE, b :: OreMonVE)\n"
 
@@ -83,7 +89,9 @@ function create_order(A :: Vector{Vector{I}},::Val{M}) where {M <: AbsOreMonomia
     eval(Meta.parse(prog2))
 
     global ord_ctr += 1
-    return eval(Meta.parse("$(namestruct)()"))
+    ord = eval(Meta.parse("$(namestruct)()"))
+    MONOMIAL_ORDER_CACHE[key] = ord
+    return ord
 end
 
 

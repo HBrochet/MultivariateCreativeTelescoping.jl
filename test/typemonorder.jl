@@ -6,7 +6,9 @@ using MultivariateCreativeTelescoping
     dic = Dict("dx" => 1, "dy" => 2, "x" => 3, "y" => 4)
     A = OreMonVE{4, Int16}
     ord = make_order(" grevlex x y dx dy", dic, Val(A))
+    ord2 = make_order(" grevlex x y dx dy", dic, Val(A))
     @test ord isa AbsMonomialOrder
+    @test typeof(ord2) === typeof(ord)
 
     m1 = makemon([Int16(1), Int16(0), Int16(0), Int16(0)])
     m2 = makemon([Int16(0), Int16(1), Int16(0), Int16(0)])
