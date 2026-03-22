@@ -4,11 +4,31 @@ struct TracerDerRedMap{M}
 end
 
 
+@inline xvars_range(A::OreAlg) = A.nrdv + A.npdv + 1:A.nrdv + 2*A.npdv
+@inline dxvars_range(A::OreAlg) = A.nrdv + 1:A.nrdv + A.npdv
+
+
+function xdeg_gap(p :: OrePoly, A:: OreAlg)
+    isempty(p) && return 0
+    return maximum(xdeg_gap(m, A) for m in mons(p))
+end
+
+function xdeg_gap(m :: OreMonVE, A:: OreAlg)
+    return sum(m[i] for i in xvars_range(A)) - sum(m[i] for i in dxvars_range(A))
+end
+
+function red_dt_xgain(red_dt :: OrePoly, A:: OreAlg)
+    length(red_dt) <= 1 && return 0
+    return maximum(xdeg_gap(mon(red_dt,j), A) for j in 2:length(red_dt))
+end
+
+
 function maxdegx(p :: OrePoly, A:: OreAlg)
-    return maximum(sum(m[i] for i in 2+A.npdv:1+2*A.npdv) for m in mons(p))
+    isempty(p) && return 0
+    return maximum(sum(m[i] for i in xvars_range(A)) for m in mons(p))
 end
 function maxdegx(m :: OreMonVE, A:: OreAlg)
-    return sum(m[i] for i in 2+A.npdv:1+2*A.npdv)
+    return sum(m[i] for i in xvars_range(A))
 end
 
 
@@ -47,7 +67,7 @@ function der_red_map_precomp(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, A
     lm_g1 = [mon(g,1) for g in g1]
     spol = GD_reduction1!(spol,g1,A)
     d = maxdegx(spol,A)
-    tmp =  maximum([maximum([sum(m[i] for i in 2+A.npdv:1+2*A.npdv) - sum(m[i] for i in 2:1+A.npdv) for m in mons(p)]) for p in g2])
+    tmp =  maximum(maximum(xdeg_gap(m, A) for m in mons(p)) for p in g2)
     d = max(d,tmp) + 2
     t = time()
     echelon, next_incr = GD_prereduction_init(g2, g1, d, A)
@@ -56,7 +76,7 @@ function der_red_map_precomp(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, A
     nd = maxdegx(spol,A)
     stairs = SortedSet{M}[]
     # maximal increase in degree when multiplying by dt
-    l = maximum([sum(mon(red_dt,j)[i] for i in 2+A.npdv:1+2*A.npdv) - sum(mon(red_dt,j)[i] for i in 2:1+A.npdv) for j in 2:length(red_dt)])
+    l = red_dt_xgain(red_dt, A)
     if l <= 0 
         #is it overkill ? 
         for i in 1:5
@@ -66,7 +86,7 @@ function der_red_map_precomp(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, A
         return spol,g1, red_dt, echelon
     end
 
-    understair = SortedSet{M}(order(A),[makemon(1,A)^i for i in 0:mon(red_dt,1)[1]-1])
+    understair = SortedSet{M}(order(A),[makemon(-1,A)])
     push!(stairs, SortedSet{M}(order(A)))
 
     for i in 1:nd
@@ -107,7 +127,7 @@ function der_red_map_precomp2(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, 
         L[i-1] = red_dt[i]
     end
 
-    red_dt_degx = maximum(sum(mon(red_dt,j)[i] for i in 2+A.npdv:1+2*A.npdv) - sum(mon(red_dt,j)[i] for i in 2:1+A.npdv) for j in 2:length(red_dt))
+    red_dt_degx = red_dt_xgain(red_dt, A)
     g1,g2 = separate(gb,A)
     if length(g2) == 0
         if B 
@@ -117,10 +137,10 @@ function der_red_map_precomp2(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, 
         end
     end
 
-    spol_degx = sum(mon(red_dt,1)[i] for i in 2+A.npdv:1+2*A.npdv)
+    spol_degx = sum(mon(red_dt,1)[i] for i in xvars_range(A))
     spol = GD_reduction1!(spol,g1,A,geob,tmp_poly)
     rho =  1
-    ll = maximum(sum(mon(p,1)[i] for i in 2+A.npdv:1+2*A.npdv) for p in g2)
+    ll = maximum(sum(mon(p,1)[i] for i in xvars_range(A)) for p in g2)
     s = max(max(red_dt_degx,0) + max(spol_degx,0),ll)
     if B 
         echelon, next_incr, set_trace = GD_prereduction_init(g2, g1, s + rho, A,geob,tmp_poly,tracer = Val(B))
@@ -136,7 +156,7 @@ function der_red_map_precomp2(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, 
         restart = false
         while !isempty(todo)
             m = poplast!(todo)
-            m_degx = sum(m[i] for i in 2+A.npdv:1+2*A.npdv)
+            m_degx = sum(m[i] for i in xvars_range(A))
             if m_degx > s + rho
                 s += 1
                 next_incr = GD_prereduction_increment!(echelon,next_incr,g1,SortedSet{M}(order(A)),A,geob,tmp_poly)
@@ -177,62 +197,7 @@ end
         
 
 function der_red_map_precomp(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, A :: OreAlg{T,C,M,O}, geob :: GeoBucket, tmp_poly :: ReuseOrePoly) where {T,C,M,O}
-    red_dt = find_red_dt(gb,A)
-    g1,g2 = separate(gb,A)
-    if length(g2) == 0
-        return spol, g1, red_dt, OrePoly{T,M}[]
-    end
-
-    lm_g1 = [mon(g,1) for g in g1]
-    spol = GD_reduction1!(spol,g1,A)
-    # d = maxdegx(spol,A)
-    # tmp =  maximum([maximum([sum(m[i] for i in 2+A.npdv:1+2*A.npdv) - sum(m[i] for i in 2:1+A.npdv) for m in mons(p)]) for p in g2])
-    d = max(d,tmp) + 2
-    echelon, next_incr = GD_prereduction_init(g2, g1, d, A)
-    lm_ech = SortedSet(order(A),[mon(g,1) for g in echelon])
-    spol = reduce_with_echelon!(echelon,spol,A)
-    nd = maxdegx(spol,A)
-    stairs = SortedSet{M}[]
-    # maximal increase in degree when multiplying by dt
-    l = maximum([sum(mon(red_dt,j)[i] for i in 2+A.npdv:1+2*A.npdv) - sum(mon(red_dt,j)[i] for i in 2:1+A.npdv) for j in 2:length(red_dt)])
-    if l <= 0 
-        #is it overkill ? 
-        for i in 1:5
-            next_incr = GD_prereduction_increment!(echelon,next_incr,g1,SortedSet{M}(order(A)),A)
-        end
-        spol = reduce_with_echelon!(echelon,spol,A)
-        return spol,g1, red_dt, echelon
-    end
-
-    understair = SortedSet{M}(order(A),[makemon(1,A)^i for i in 0:mon(red_dt,1)[1]-1])
-    push!(stairs, SortedSet{M}(order(A)))
-
-    for i in 1:nd
-        understair, _ = next_slice(understair, lm_g1, lm_ech, A)
-        push!(stairs, SortedSet{M}(order(A)))
-    end
-
-    t = time()
-    for i in nd+1:d
-        understair, irred = next_slice(understair, lm_g1, lm_ech, A)
-        push!(stairs, SortedSet{M}(order(A),irred))
-    end
-
-    itt = 0
-    t = time()
-    while !termination_criterion_der_red_map_precomp(stairs,nd,l)
-        itt += 1
-        newlm = SortedSet{M}(order(A))
-        next_incr = GD_prereduction_increment!(echelon,next_incr,g1,SortedSet{M}(order(A)),A;newlm = newlm)
-        union!(lm_ech, newlm)
-        understair, irred = next_slice(understair, lm_g1, lm_ech, A)
-        push!(stairs,SortedSet{M}(order(A),irred))
-        update_stairs!(stairs,newlm,nd,A)
-    end
-
-    spol = reduce_with_echelon!(echelon,spol,A)
-    # error("fin")
-    return spol, g1, red_dt, echelon
+    return der_red_map_precomp2(spol,gb,A,geob,tmp_poly)
 end
 
 

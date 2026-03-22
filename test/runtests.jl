@@ -151,6 +151,80 @@ end
     
 end
 
+@testset "Multi-parameter derivation map" begin
+    A = OreAlg(order = "lex d1 d2 dx x",
+               ratdiffvars = (["t1","t2"],["d1","d2"]),
+               poldiffvars = (["x"],["dx"]))
+
+    gb = [parse_OrePoly("d1-1",A),
+          parse_OrePoly("d2-1",A)]
+
+    res = der_red_map_many(A, one(A), gb, mct_param())
+
+    @test res.dops == ["d1","d2"]
+    @test length(res.red_dts) == 2
+    @test res.red_dts[1] == parse_OrePoly("d1-1",A)
+    @test res.red_dts[2] == parse_OrePoly("d2-1",A)
+    @test res.spol == one(A)
+    @test length(res.basis) == 1
+    @test makemon(-1,A) in res.basis
+    @test res.der_maps[1][makemon(-1,A)] == one(A)
+    @test res.der_maps[2][makemon(-1,A)] == one(A)
+
+    function column_to_poly(mat, basis, j, A)
+        cs = eltype_co(A)[]
+        ms = eltype_mo(A)[]
+        for i in 1:length(basis)
+            if !iszero(mat[i,j])
+                push!(cs, mat[i,j])
+                push!(ms, basis[i])
+            end
+        end
+        p = OrePoly(cs,ms)
+        normalize!(p,A)
+        return p
+    end
+
+    for i in 1:length(res.der_maps)
+        for j in 1:length(res.basis)
+            @test column_to_poly(res.der_mats[i], res.basis, j, A) == res.der_maps[i][res.basis[j]]
+        end
+    end
+end
+
+@testset "Multi-parameter direct LDE system" begin
+    A = OreAlg(order = "lex d1 d2 dx x",
+               ratdiffvars = (["t1","t2"],["d1","d2"]),
+               poldiffvars = (["x"],["dx"]))
+
+    gb = [parse_OrePoly("d1-1",A),
+          parse_OrePoly("d2-1",A)]
+
+    red = der_red_map_many(A, one(A), gb, mct_param())
+    sys = find_LDE_direct_many(red.der_maps, red.spol, A)
+
+    @test length(sys) == 2
+    @test parse_OrePoly("d1-1", A) in sys
+    @test parse_OrePoly("d2-1", A) in sys
+end
+
+@testset "MCTMany rational integrand example" begin
+    A = OreAlg(order = "lex d1 d2 dx x",
+               ratdiffvars = (["t1","t2"],["d1","d2"]),
+               poldiffvars = (["x"],["dx"]))
+
+    # I(t1,t2) = \int_gamma x/(t1*t2-x) dx
+    gb = [parse_OrePoly("t1*d1 + x*dx", A),
+          parse_OrePoly("t2*d2 + x*dx", A),
+          parse_OrePoly("x*(t1*t2-x)*dx - t1*t2", A)]
+
+    sys = MCTMany(one(A), gb, A)
+
+    @test length(sys) == 2
+    @test parse_OrePoly("t1*d1 - 1", A) in sys
+    @test parse_OrePoly("t2*d2 - 1", A) in sys
+end
+
 
 ### test for mri 
 

@@ -6,6 +6,6 @@ using MultivariateCreativeTelescoping
     gens = dfinite_expr_to_ann(:(exp((x + y + 1)^(1//2))), A)
 
     @test parse_OrePoly("-dx + dy", A) in gens
-    @test parse_OrePoly("dx^2 + 1//(2*x + 2*y + 2)*dx - 1//(4*x + 4*y + 4)", A) in gens
+    @test parse_OrePoly("(4*x + 4*y + 4)*dx^2 + 2*dx - 1", A) in gens
     @test parse_OrePoly("dz", A) in gens
 end

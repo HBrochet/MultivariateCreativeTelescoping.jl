@@ -2,8 +2,6 @@
 function _ann_poly_power_data(f_in::Union{String,Expr,Symbol}, s_in::Union{String,Symbol}, A::OreAlg)
     f_expr = f_in isa String ? Meta.parse(f_in) : f_in
     f_rat = _dfinite_expr_to_ratfun(f_expr, A)
-    den = Nemo.denominator(f_rat, false)
-    isone(den) || error("ann_poly_power expects a polynomial expression")
 
     sname = s_in isa String ? s_in : String(s_in)
     sname in A.inp.ratvars || error("ann_poly_power expects $(sname) to be declared in ratvars")

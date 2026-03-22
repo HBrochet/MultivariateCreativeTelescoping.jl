@@ -138,6 +138,12 @@ end
     @test err.value.msg == "Polynomial powers currently support only bare symbolic exponents, not mixed expressions like s + 1 / 2"
 end
 
+@testset "dfinite symbolic power with rational base" begin
+    A = dfinite_ore_alg(["x"]; ratvars = ["s"])
+    gens = dfinite_expr_to_ann("(x/(x+1))^s", A)
+    @test gens[1] == parse_OrePoly("(x^2 + x)*dx - s", A)
+end
+
 @testset "dfinite product uses polynomial power factor" begin
     A = dfinite_ore_alg(["x"]; ratvars = ["s"])
     gens = dfinite_expr_to_ann("sin(x) * (x + 1)^s", A)

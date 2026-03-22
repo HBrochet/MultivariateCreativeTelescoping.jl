@@ -25,5 +25,5 @@ end
     A = OreAlg(order = "grevlex dx", ratdiffvars = (["x"], ["dx"]))
     gens = dfinite_expr_to_ann(:(exp(x^2 + 1)), A)
 
-    @test gens == [parse_OrePoly("1/(2*x)*dx - 1", A)]
+    @test gens == [parse_OrePoly("dx - 2*x", A)]
 end
