@@ -91,7 +91,7 @@ function OreAlg(;order :: String = "",
                                             varord,
                                             inp)
     
-    (polsloc, diff_pols_loc) = Base.invokelatest(compute_locpol_and_derivs,locvars[2],tmpA)
+    (polsloc, diff_pols_loc) = compute_locpol_and_derivs(locvars[2], tmpA)
 
     nomul_ = [sti[s] for s in nomul]
     return OreAlg{eltype1_ctx(ctx), typeof(ctx),M,typeof(ord)}(sti,
@@ -568,4 +568,3 @@ function unflatten(p :: OrePoly{T,K},A :: OreAlg) where {T,K}
     return res 
 end
  
-

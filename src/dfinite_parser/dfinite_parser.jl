@@ -8,9 +8,9 @@ function dfinite_expr_to_ann(expr_in::Union{String,Expr}, A::OreAlg; ratvars::Un
         error("Input expression is incomplete or malformed")
     end
     Ac = _dfinite_temp_closure_alg(A)
-    gens = Base.invokelatest(_dfinite_expr_to_ann, expr, Ac)
-    Base.invokelatest(clear_denominators!,gens,Ac)
-    return Base.invokelatest(map_algebras, gens,Ac,A)
+    gens = _dfinite_expr_to_ann(expr, Ac)
+    clear_denominators!(gens, Ac)
+    return map_algebras(gens, Ac, A)
 end
 
 function dfinite_expr_to_ann(expr_in::Union{String,Expr}; ratvars::Union{Vector{Symbol},Vector{String}} = Symbol[])
@@ -24,9 +24,9 @@ function dfinite_expr_to_ann(expr_in::Union{String,Expr}; ratvars::Union{Vector{
     filter!(v -> !(v in ratvar_names), ratdiffvars)
     A = dfinite_ore_alg(ratdiffvars; ratvars = ratvar_names)
     Ac = _dfinite_temp_closure_alg(A)
-    gens = Base.invokelatest(_dfinite_expr_to_ann, expr, Ac)
-    Base.invokelatest(clear_denominators!,gens,Ac)
-    return  Base.invokelatest(map_algebras,gens,Ac,A), A
+    gens = _dfinite_expr_to_ann(expr, Ac)
+    clear_denominators!(gens, Ac)
+    return map_algebras(gens, Ac, A), A
 end
 
 function _dfinite_expr_to_ann(expr::Expr, A::OreAlg)
