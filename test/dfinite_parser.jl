@@ -1,4 +1,5 @@
 using Test
+using Nemo: gens
 using MultivariateCreativeTelescoping
 
 @testset "dfinite_expr_to_ann with provided algebra" begin
@@ -133,9 +134,13 @@ end
     @test gens1 == gens2
 end
 
-@testset "dfinite polynomial power with mixed symbolic exponent reports explicit error" begin
-    err = @test_throws ErrorException dfinite_expr_to_ann("x^(s+1/2)", ratvars = ["s"])
-    @test err.value.msg == "Polynomial powers currently support only bare symbolic exponents, not mixed expressions like s + 1 / 2"
+@testset "dfinite polynomial power with rational ratvar exponent" begin
+    A = dfinite_ore_alg(["x"]; ratvars = ["s"])
+    gens1 = dfinite_expr_to_ann("(x + 1)^(2*s + 3)", A)
+    @test gens1[1] == parse_OrePoly("(x + 1)*dx - 2*s - 3", A)
+
+    gens2 = dfinite_expr_to_ann("(x + 1)^(s/(s+1))", A)
+    @test gens2[1] == parse_OrePoly("(x + 1)*(s + 1)*dx - s", A)
 end
 
 @testset "dfinite symbolic power with rational base" begin
@@ -148,6 +153,19 @@ end
     A = dfinite_ore_alg(["x"]; ratvars = ["s"])
     gens = dfinite_expr_to_ann("sin(x) * (x + 1)^s", A)
     @test gens[1] == parse_OrePoly("(x^2 + 2*x + 1)*dx^2 + (-2*x*s - 2*s)*dx + (x^2 + 2*x + s^2 + s + 1)", A)
+end
+
+@testset "evaluate annihilator at named parameter" begin
+    A = dfinite_ore_alg(["x"]; ratvars = ["s"])
+    ann = dfinite_expr_to_ann("(x + 1)^s", A)
+    @test typeof(evaluate(coeff(ann[1], 1), "s", 0)) == typeof(coeff(ann[1], 1))
+    ev_ann = evaluate(ann, "s", 0)
+    @test length(ev_ann) == 1
+    @test length(ev_ann[1]) == 1
+    @test mon(ev_ann[1], 1) == mon(parse_OrePoly("dx", A), 1)
+    R = parent(coeff(ev_ann[1], 1))
+    x = gens(R)[1]
+    @test coeff(ev_ann[1], 1) == x + 1
 end
 
 #todo: this is bugged @time gens, A  = dfinite_expr_to_ann("sin(x+y)*bessel_J(k,2*x-y)/exp((x^2 + 1)^(1/2))",ratvars=["k"])

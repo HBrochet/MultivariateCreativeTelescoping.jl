@@ -51,4 +51,14 @@ end
 
      A_poly = OreAlg(order = "lex x dt dx", ratdiffvars = (["t"],["dt"]), poldiffvars = (["x"], ["dx"]), fraction_free = true)
     @test ctx(A_poly) isa ZZPolyCtx
+
+    A_mpoly = OreAlg(order = "lex x y dt dx dy",
+                     ratdiffvars = (["t"], ["dt"]),
+                     poldiffvars = (["x", "y"], ["dx", "dy"]),
+                     ratvars = ["s"],
+                     fraction_free = true)
+    init = weyl_closure_init(A_mpoly)
+    @test init isa WeylClosureInit
+    @test length(init.A.diff_pols_loc) == 1
+    @test length(init.A.diff_pols_loc[1]) == A_mpoly.nrdv + A_mpoly.npdv
 end
