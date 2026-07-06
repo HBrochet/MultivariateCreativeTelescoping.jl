@@ -46,7 +46,6 @@ include("DerivRedMap.jl")
 include("DerivRedMapMany.jl")
 include("MCT.jl")
 include("MCTMany.jl")
-include("PicardFuchs.jl")
 include("Picard_fuchs.jl")
 
 include("AlgebraMorphisms.jl")
