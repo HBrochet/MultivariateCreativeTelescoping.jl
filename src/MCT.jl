@@ -1,4 +1,9 @@
 
+function _mct_coeff_derivative(c, A::OreAlg)
+    xname = A.inp.ratdiffvars[1][1]
+    return coeff_derivative(c, A.drvars_to_int[xname], A)
+end
+
 function MCT_internal(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, A::OreAlg{T,C,M,O}, param :: MCTParam) where {T,C,M,O}
     push!(A.nomul,1)
     par = ci_param(comp = Val(:fast), same_den = Val(false))
@@ -79,6 +84,8 @@ function find_LDE_by_interpolation(der_map :: Dict{M,OrePoly{T,M}}, spol :: OreP
 end
 
 function find_LDE_direct(der_map :: Dict{M,OrePoly{T,M}}, spol :: OrePoly{T,M}, A :: OreAlg) where {T,M}
+    iszero(spol, A) && return one(A)
+
     den = denominator(spol, A; normalize = Val(true))
     for v in values(der_map)
         den = lcm(den,denominator(v, A; normalize = Val(true)))
@@ -171,13 +178,13 @@ function compute_next_rel(map_ :: Dict{M,OrePoly{T,M}}, pol :: OrePoly{T,M}, den
     cs = deepcopy(coeffs(pol))
     ms = deepcopy(mons(pol))
     for i in 1:length(cs)
-        cs[i] = ctx(A).F(derivative(Nemo.numerator(cs[i],true))*den)
+        cs[i] = ctx(A).F(_mct_coeff_derivative(Nemo.numerator(cs[i], true), A) * den)
     end
     res = OrePoly(cs,ms)
     normalize!(res,A)
     if !isone(den)
         cpol = deepcopy(pol)
-        mul!(ctx(A).F(ord+1)*ctx(A).F(derivative(den)),cpol,A)
+        mul!(ctx(A).F(ord + 1) * ctx(A).F(_mct_coeff_derivative(den, A)), cpol, A)
         res = sub!(res,cpol,A)
     end
     for (c,m) in pol 
@@ -197,17 +204,7 @@ function  line_mat_to_orepoly(line_mat ::Nemo.fpMatrix, A :: OreAlg)
     return res
 end
 
-function  line_mat_to_orepoly(line_mat ::Generic.MatSpaceElem{Generic.FracFieldElem{Nemo.fpPolyRingElem}}, A :: OreAlg)
-    l = number_of_columns(line_mat)
-    res = undefOrePoly(l,A)
-    for i in l:-1:1
-        res[l-i+1] = (line_mat[1,i], makemon(1,A)^(i-1))
-    end
-    normalize!(res,A)
-    return res
-end
-
-function  line_mat_to_orepoly(line_mat ::Generic.MatSpaceElem{Generic.FracFieldElem{Nemo.ZZPolyRingElem}}, A :: OreAlg)
+function  line_mat_to_orepoly(line_mat ::Generic.MatSpaceElem{<:Generic.FracFieldElem}, A :: OreAlg)
     l = number_of_columns(line_mat)
     res = undefOrePoly(l,A)
     for i in l:-1:1
