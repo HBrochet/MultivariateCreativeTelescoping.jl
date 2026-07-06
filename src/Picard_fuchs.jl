@@ -113,6 +113,87 @@ function _pf_coeff_polynomial_to_orepoly(p, parseA::OreAlg, A::OreAlg, variables
     return res
 end
 
+function _pf_homogenize_fraction(
+    num::OrePoly,
+    den::OrePoly,
+    A::OreAlg,
+    affine_dim::Int,
+    pole_order::Int;
+    force_x0_factor::Bool,
+)
+    iszero(den, A) && error("denominator must be non-zero")
+    N0 = _pf_total_x_degree(den, A)
+    degnum = _pf_total_x_degree(num, A)
+    needed = degnum + affine_dim + 1 - pole_order * N0
+    extra_x0 = max(0, cld(needed, pole_order))
+    if force_x0_factor
+        extra_x0 = max(extra_x0, 1)
+    end
+
+    den_h = _pf_homogenize_polynomial(den, N0, A)
+    f = _pf_mul_x0_power(den_h, extra_x0, A)
+    N = N0 + extra_x0
+    target_num_degree = pole_order * N - affine_dim - 1
+    target_num_degree >= 0 || error("homogenized numerator degree is negative")
+    numerator = _pf_homogenize_polynomial(num, target_num_degree, A)
+    scale = inv(convertn(factorial(big(pole_order - 1)), ctx(A)), ctx(A))
+    alpha0 = Dict{Int,typeof(numerator)}(pole_order => mul(scale, numerator, A))
+    return (
+        numerator = numerator,
+        f = f,
+        alpha0 = alpha0,
+        pole_order = pole_order,
+        denominator_degree = N,
+    )
+end
+
+function _pf_homogenize_polynomial(p::OrePoly{T,M}, target_degree::Int, A::OreAlg) where {T,M}
+    target_degree < 0 && error("target homogeneous degree must be non-negative")
+    res = zero(A)
+    x0 = makemon(A.nrdv + A.npdv + 1, A)
+    for (c, m) in p
+        _pf_has_derivative(m, A) && error("homogenization expects commutative polynomials")
+        deg = _pf_x_degree(m, A)
+        exp0 = target_degree - deg
+        exp0 < 0 && error("cannot homogenize term of degree $(deg) to degree $(target_degree)")
+        res = add!(res, makepoly(c, m * x0^exp0), A)
+    end
+    return res
+end
+
+function _pf_mul_x0_power(p::OrePoly, k::Int, A::OreAlg)
+    k == 0 && return p
+    x0 = makepoly(one(ctx(A)), makemon(A.nrdv + A.npdv + 1, A)^k)
+    return mul(x0, p, A)
+end
+
+function _pf_total_x_degree(p::OrePoly, A::OreAlg)
+    isempty(p) && return 0
+    return maximum(_pf_x_degree(m, A) for m in mons(p))
+end
+
+function _pf_x_degree(m::OreMonVE, A::OreAlg)
+    s = 0
+    for i in A.nrdv + A.npdv + 1:A.nrdv + 2A.npdv
+        s += Int(m[i])
+    end
+    return s
+end
+
+function _pf_has_derivative(m::OreMonVE, A::OreAlg)
+    for i in A.nrdv + 1:A.nrdv + A.npdv
+        !iszero(m[i]) && return true
+    end
+    return false
+end
+
+function _pf_forbid_derivative_multipliers!(A::OreAlg)
+    for i in A.nrdv + 1:A.nrdv + A.npdv
+        i in A.nomul || push!(A.nomul, i)
+    end
+    return A
+end
+
 function _pf_order(rdops::Vector{String}, pvars::Vector{String}, pdops::Vector{String})
     blocks = String[]
     isempty(rdops) || push!(blocks, "lex " * join(rdops, " "))
