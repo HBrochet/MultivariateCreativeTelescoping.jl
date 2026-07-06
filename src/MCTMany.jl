@@ -89,14 +89,10 @@ end
 Compute a mixed system of differential equations directly over the current coefficient field.
 """
 function MCTMany(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, A::OreAlg{T,C,M,O}; param :: MCTParam = mct_param()) where {T,C,M,O}
-    push!(A.nomul, 1)
-    try
-        red = der_red_map_many(A, spol, gb, param)
-        debug(param) && @debug "der_red_map_many computed directly, starting to compute the mixed LDE system"
-        return find_LDE_direct_many(red, A)
-    finally
-        deleteat!(A.nomul, length(A.nomul))
-    end
+    push!(A.nomul, 1) #todo: a faire pour chaque ti non ? 
+    red = der_red_map_many(A, spol, gb, param)
+    debug(param) && @debug "der_red_map_many computed directly, starting to compute the mixed LDE system"
+    return find_LDE_direct_many(red, A)
 end
 
 function MCTMany(A::OreAlg{T,C,M,O}, spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}; param :: MCTParam = mct_param()) where {T,C,M,O}
