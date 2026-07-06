@@ -40,7 +40,7 @@ function ann_comp_right_rat(
         tmp = ann_comp_right_rat_ev_LDE(A, g, j, lexpr)
 
         # differentiate g 
-        dg = ctx(A) isa MRatFunCtx ? derivative(g_rat, ctx(A).vars[A.drvars_to_int[xname]]) : derivative(g_rat)
+        dg = coeff_derivative(g_rat, A.drvars_to_int[xname], A)
         
         # evaluate D[j] at D[j]/dg or return D[j] is dg = 0 
         tmp = ann_comp_right_rat_ev_D(A, dg, idx, tmp)

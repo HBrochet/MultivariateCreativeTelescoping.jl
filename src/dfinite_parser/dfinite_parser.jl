@@ -136,8 +136,10 @@ function _dfinite_parse_power_ann(expr::Expr, A::OreAlg)
     elseif pow isa Symbol
         String(pow) in A.inp.ratvars || error("Symbolic exponents must be a ratvar symbol")
         return ann_poly_power(base, pow, A)
+    elseif _dfinite_expr_is_ratvar_rational(pow_arg, A)
+        return ann_poly_power(base, pow_arg, A)
     elseif _dfinite_expr_depends_on_ratvars(pow_arg, A)
-        error("Polynomial powers currently support only bare symbolic exponents, not mixed expressions like $(pow_arg)")
+        error("Polynomial powers currently support only rational expressions in ratvars for symbolic exponents, not $(pow_arg)")
     end
     error("Only integer, rational exponents are currently supported in parser power nodes")
 end
@@ -319,7 +321,7 @@ function _dfinite_leaf_operator_ann(op_expr::Expr, xarg, A::OreAlg)
             tmp = ann_comp_right_rat_ev_LDE(A, xarg, j, op_expr)
             xname = A.inp.ratdiffvars[1][j]
             idx = A.strvar_to_indexp[A.inp.ratdiffvars[2][j]]
-            dg = ctx(A) isa MRatFunCtx ? derivative(g_rat, ctx(A).vars[A.drvars_to_int[xname]]) : derivative(g_rat)
+            dg = coeff_derivative(g_rat, A.drvars_to_int[xname], A)
             push!(res, ann_comp_right_rat_ev_D(A, dg, idx, tmp))
         end
         return res
