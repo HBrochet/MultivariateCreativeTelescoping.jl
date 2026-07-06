@@ -267,6 +267,27 @@ function change_coefficient_field(a :: Any,:: OreAlg)
     return a 
 end
 
+function evaluate(pol :: OrePoly{T,M}, svar::Union{String,Symbol}, value) where {T<:RatFun,M}
+    length(pol) == 0 && return pol
+
+    F = parent(coeff(pol,1))
+    new_coeffs = T[]
+    new_mons = M[]
+
+    @inbounds for i in 1:length(pol)
+        c = F(evaluate(coeff(pol,i), svar, value))
+        iszero(c) && continue
+        push!(new_coeffs, c)
+        push!(new_mons, mon(pol, i))
+    end
+
+    return OrePoly(new_coeffs, new_mons)
+end
+
+function evaluate(g :: Vector{OrePoly{T,M}}, svar::Union{String,Symbol}, value) where {T<:RatFun,M}
+    return [evaluate(p, svar, value) for p in g]
+end
+
 """
 Given as input an algebra A  with only one parameter and a point p, return a new algebra where the parameter was evaluated to p.
 """
