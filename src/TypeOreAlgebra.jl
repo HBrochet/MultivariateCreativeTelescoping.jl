@@ -337,20 +337,23 @@ Base.one(A :: OreAlg{T,C,M,O}) where {T,C,M,O} = OrePoly(T[convert(1,ctx(A))],M[
 nvars(A :: OreAlg{T,C,M,O}) where {T,N,E,C,M <:OreMonVE{N,E},O} = N
 char(A :: OreAlg) = ctx(A).char
 
+function coeff_derivative(c, ind::Integer, A::OreAlg)
+    vars = coeff_vars(ctx(A))
+    vars === nothing && error("No coefficient variables are available for differentiation in this algebra")
+    if length(vars) == 1
+        return derivative(c)
+    end
+    return derivative(c, vars[ind])
+end
+
 
 function diff(pol_ :: OrePoly, ind_ :: Integer, A ::OreAlg)
     pol = deepcopy(pol_)
     ind = ind_
     if ind <= A.nrdv 
         cos = coeffs(pol)
-        if ctx(A) isa MRatFunCtx
-            for i in 1:length(cos)
-                cos[i] = derivative(cos[i], ctx(A).vars[ind])
-            end
-        else 
-            for i in 1:length(cos)
-                cos[i] = derivative(cos[i])
-            end
+        for i in 1:length(cos)
+            cos[i] = coeff_derivative(cos[i], ind, A)
         end
         normalize!(pol,A)
         return pol 

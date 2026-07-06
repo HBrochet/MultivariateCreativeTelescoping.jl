@@ -122,6 +122,10 @@ function convertn(x :: Integer,ctx :: Nmod32Γ)
     return convert(mod(x,Int(ctx.char)),ctx)
 end
 
+function convertn(x::fpFieldElem, ctx::Nmod32Γ)
+    return convertn(Int(x.data), ctx)
+end
+
 
 ### Rational functions
 
@@ -172,6 +176,26 @@ function evaluate(a::RatFun, p)
     num = Nemo.numerator(a, false)
     den = Nemo.denominator(a, false)
     return Nemo.evaluate(num, p) // Nemo.evaluate(den, p)
+end
+
+function evaluate(a::RatFun, svar::Union{String,Symbol}, value)
+    s = svar isa Symbol ? svar : Symbol(svar)
+    R = parent(Nemo.numerator(a, false))
+    raw_syms = R.S
+    syms = raw_syms isa Symbol ? Symbol[raw_syms] : Symbol.(raw_syms)
+    ind = findfirst(==(s), syms)
+    ind === nothing && error("Variable $(s) is not in the coefficient field $(syms)")
+
+    if length(syms) == 1
+        return evaluate(a, value)
+    end
+
+    vars = gens(R)
+    vals = Vector{elem_type(R)}(undef, length(vars))
+    @inbounds for i in eachindex(vars)
+        vals[i] = i == ind ? R(value) : vars[i]
+    end
+    return evaluate(a, vals)
 end
 
 #. ratfun mod small p 
