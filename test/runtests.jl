@@ -15,6 +15,8 @@ include("ann_poly_power.jl")
 include("ann_comp_right_rat.jl")
 include("ann_comp_right_alg.jl")
 include("minimal_polynomial.jl")
+include("module_groebner.jl")
+include("picard_fuchs.jl")
 
 # include("crt.jl")
 # include("cauchy_interpolation.jl")
@@ -125,6 +127,18 @@ end
     gb = weyl_closure(ann,A,init)
     res = MCT(spol, gb, A)
     res2 = parse_OrePoly("t*dt-1",A)
+    @test res == res2
+
+    A = OreAlg(order = "lex dt > grevlex x dx",
+               ratvars = ["m"],
+               ratdiffvars = (["t"],["dt"]),
+               poldiffvars = (["x"],["dx"]))
+    ann0, A0 = dfinite_expr_to_ann("1/(m^2-x*(1-x)*t^2)", ratvars = ["m"])
+    ann = map_algebras(ann0, A0, A)
+    init = weyl_closure_init(A)
+    gb = weyl_closure_internal(ann, A, init, wc_param(debug = Val(false)))
+    res = MCT_direct(one(A), gb, A)
+    res2 = parse_OrePoly("(t^3 - 4*t*m^2)*dt + (2*t^2 - 4*m^2)", A)
     @test res == res2
 
 
