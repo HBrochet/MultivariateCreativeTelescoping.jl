@@ -387,14 +387,10 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K2,M}, A :: OreAlg) where {M,K,K2}
         end
     end
 
-    if ctx(A) isa RatFunCtx
+    if coeff_vars(ctx(A)) !== nothing
         for l in 1:A.nrdv
             if T1[2][l] == 0; continue end
-            if ctx(A) isa MRatFunCtx
-                c = derivative(T2[1],ctx(A).vars[l])
-            else 
-                c = derivative(T2[1])
-            end
+            c = coeff_derivative(T2[1], l, A)
             if iszero(c,A); continue end
             res = undefOrePoly(T1[2][l]+1,A)
             dt = makemon(l,A)
@@ -402,11 +398,7 @@ function mul_( T1 ::Tuple{K,M}, T2 :: Tuple{K2,M}, A :: OreAlg) where {M,K,K2}
             ctr = 2
             for i in T1[2][l]-1:-1:0
                 res[ctr] = (c*binomial(Int(T1[2][l]),i), T2[2] * dt^i)
-                if ctx(A) isa MRatFunCtx
-                    c = derivative(c,ctx(A).vars[l])
-                else 
-                    c = derivative(c)
-                end
+                c = coeff_derivative(c, l, A)
                 ctr += 1
             end
             return mul((T1[1],T1[2] / dt^T1[2][l]), res, A,normal=true)

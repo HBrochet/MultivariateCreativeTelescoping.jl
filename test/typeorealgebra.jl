@@ -1,4 +1,5 @@
 using Test
+using Nemo: gens
 using MultivariateCreativeTelescoping
 
 @testset "TypeOreAlgebra basics" begin
@@ -35,4 +36,29 @@ using MultivariateCreativeTelescoping
     undef = @inferred undefOrePoly(2, A)
     @test length(undef.coeffs) == 2
     @test length(undef.mons) == 2
+
+    A_copy = OreAlg(deepcopy(A.inp))
+    @test typeof(order(A_copy)) === typeof(order(A))
+end
+
+@testset "TypeOreAlgebra fraction-free coefficients" begin
+    A_frac = OreAlg(order = "lex x dx", ratvars = ["t"], poldiffvars = (["x"], ["dx"]))
+    @test ctx(A_frac) isa UnivRatFunQQCtx
+
+    A_poly = OreAlg(order = "lex x dx", ratvars = ["t"], poldiffvars = (["x"], ["dx"]), fraction_free = true)
+    @test ctx(A_poly) isa ZZPolyCtx
+    @test A_poly.ratvars["t"] == ctx(A_poly).vars[1]
+
+     A_poly = OreAlg(order = "lex x dt dx", ratdiffvars = (["t"],["dt"]), poldiffvars = (["x"], ["dx"]), fraction_free = true)
+    @test ctx(A_poly) isa ZZPolyCtx
+
+    A_mpoly = OreAlg(order = "lex x y dt dx dy",
+                     ratdiffvars = (["t"], ["dt"]),
+                     poldiffvars = (["x", "y"], ["dx", "dy"]),
+                     ratvars = ["s"],
+                     fraction_free = true)
+    init = weyl_closure_init(A_mpoly)
+    @test init isa WeylClosureInit
+    @test length(init.A.diff_pols_loc) == 1
+    @test length(init.A.diff_pols_loc[1]) == A_mpoly.nrdv + A_mpoly.npdv
 end

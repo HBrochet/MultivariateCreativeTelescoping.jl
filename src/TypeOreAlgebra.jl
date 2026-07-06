@@ -8,6 +8,7 @@ mutable struct OreAlgInput
     polvars :: Vector{String}
     locvars :: Tuple{Vector{String},Vector{String}}
     nomul :: Vector{String}
+    fraction_free :: Bool
     varord :: String
 end
 
@@ -42,7 +43,8 @@ end
             polvars :: Vector{String} = String[],
             locvars :: Tuple{Vector{String},Vector{String}} = (String[],String[]),
             order :: String = "",
-            nomul :: Vector{String} = String[]
+            nomul :: Vector{String} = String[],
+            fraction_free :: Bool = false
 """
 function OreAlg(;order :: String = "",
     char :: Int = 0,
@@ -52,10 +54,11 @@ function OreAlg(;order :: String = "",
     polvars :: Vector{String} = String[],
     locvars :: Tuple{Vector{String},Vector{String}} = (String[],String[]),
     nomul :: Vector{String} = String[],
+    fraction_free :: Bool = false,
     varord :: String = "dleft")
 
     ### Create context for coefficients
-    ctx = make_coeff_context(char,ratvars,ratdiffvars)
+    ctx = make_coeff_context(char,ratvars,ratdiffvars,fraction_free)
 
     ### Initialising variable name tables
     sti, its, rv, rti, itr = make_var_tables(ratvars,ratdiffvars,poldiffvars,polvars,locvars,ctx)
@@ -68,7 +71,7 @@ function OreAlg(;order :: String = "",
     ### Creating the monomial order
     ord = make_order(order,sti,Val(M))
 
-    inp = OreAlgInput(order, char,ratvars, ratdiffvars,poldiffvars,polvars,locvars,nomul,varord)
+    inp = OreAlgInput(order, char,ratvars, ratdiffvars,poldiffvars,polvars,locvars,nomul,fraction_free,varord)
 
     ### Computing the polynomials w.r.t. which we localize and their derivatives
     tmpA = OreAlg{eltype1_ctx(ctx), typeof(ctx),M,typeof(ord)}(sti,
@@ -88,7 +91,7 @@ function OreAlg(;order :: String = "",
                                             varord,
                                             inp)
     
-    (polsloc, diff_pols_loc) = Base.invokelatest(compute_locpol_and_derivs,locvars[2],tmpA)
+    (polsloc, diff_pols_loc) = compute_locpol_and_derivs(locvars[2], tmpA)
 
     nomul_ = [sti[s] for s in nomul]
     return OreAlg{eltype1_ctx(ctx), typeof(ctx),M,typeof(ord)}(sti,
@@ -110,7 +113,7 @@ function OreAlg(;order :: String = "",
 end
 
 
-function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars :: Tuple{Vector{String},Vector{String}})
+function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars :: Tuple{Vector{String},Vector{String}}, fraction_free :: Bool)
     # coefficients will be univariate rational functions 
     if (length(ratvars) + length(ratdiffvars[1])) ==1
         if length(ratvars) == 1 
@@ -120,10 +123,16 @@ function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars 
         end
         if char > 0 
             S,vars = polynomial_ring(Native.GF(char),var)
+            if fraction_free
+                return fpPolyCtx(S, [vars], char)
+            end
             F = fraction_field(S)
             return UnivRatFunModpCtx(F,S,[vars],char)
         else 
             S,vars = polynomial_ring(ZZ,var)
+            if fraction_free
+                return ZZPolyCtx(S, [vars])
+            end
             F = fraction_field(S)
             return UnivRatFunQQCtx(F,S,[vars])
         end
@@ -131,10 +140,16 @@ function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars 
     elseif (length(ratvars) + length(ratdiffvars[1])) > 1
         if char > 0 
             S,vars = polynomial_ring(Native.GF(char),vcat(ratdiffvars[1],ratvars))
+            if fraction_free
+                return fpMPolyCtx(S, vars, char)
+            end
             F = fraction_field(S)
             return RatFunModpCtx(F,S,vars,char)
         else 
             S,vars = polynomial_ring(ZZ,vcat(ratdiffvars[1],ratvars))
+            if fraction_free
+                return ZZMPolyCtx(S, vars)
+            end
             F = fraction_field(S)
             return RatFunQQCtx(F,S,vars)
         end
@@ -142,10 +157,31 @@ function make_coeff_context(char :: Int, ratvars :: Vector{String}, ratdiffvars 
     else 
         if char > 0 
             return Nmod32Γ(char)
-        else 
+        elseif fraction_free 
+            return ZZCtx()
+        else
             return QQCtx()
         end
     end
+end
+
+coeff_vars(ctx :: RatFunCtx) = ctx.vars
+coeff_vars(ctx :: ZZPolyCtx) = ctx.vars
+coeff_vars(ctx :: ZZMPolyCtx) = ctx.vars
+coeff_vars(ctx :: fpPolyCtx) = ctx.vars
+coeff_vars(ctx :: fpMPolyCtx) = ctx.vars
+
+coeff_vars(ctx ::QQCtx) = nothing
+coeff_vars(ctx ::Nmod32Γ) = nothing 
+coeff_vars(ctx ::ZZCtx) = nothing
+
+
+@inline function coeff_var(ctx :: RatFunCtx, vars, i :: Int)
+    return ctx.F(vars[i])
+end
+
+@inline function coeff_var(:: RingCtx, vars, i :: Int)
+    return vars[i]
 end
 
 function make_var_tables(ratvars :: Vector{String},
@@ -163,8 +199,10 @@ function make_var_tables(ratvars :: Vector{String},
     rti = Dict{String,Int}()
     itr = String[]
 
+    coeffvars = coeff_vars(ctx)
+
     for (i,s) in enumerate(ratvars)
-        rv[s] = ctx.F(ctx.vars[i+length(ratdiffvars[1])])
+        rv[s] = coeff_var(ctx, coeffvars, i + length(ratdiffvars[1]))
     end
 
 
@@ -173,7 +211,7 @@ function make_var_tables(ratvars :: Vector{String},
         push!(its,s)
     end
     for (i,s) in enumerate(ratdiffvars[1])
-        rv[s] = ctx.F(ctx.vars[i])
+        rv[s] = coeff_var(ctx, coeffvars, i)
         push!(itr,s)
         rti[s] = i
     end
@@ -230,6 +268,7 @@ function OreAlg(inp :: OreAlgInput)
                 polvars = inp.polvars,
                 locvars = inp.locvars,
                 nomul = inp.nomul,
+                fraction_free = inp.fraction_free,
                 varord = inp.varord)
 end
 
@@ -298,20 +337,23 @@ Base.one(A :: OreAlg{T,C,M,O}) where {T,C,M,O} = OrePoly(T[convert(1,ctx(A))],M[
 nvars(A :: OreAlg{T,C,M,O}) where {T,N,E,C,M <:OreMonVE{N,E},O} = N
 char(A :: OreAlg) = ctx(A).char
 
+function coeff_derivative(c, ind::Integer, A::OreAlg)
+    vars = coeff_vars(ctx(A))
+    vars === nothing && error("No coefficient variables are available for differentiation in this algebra")
+    if length(vars) == 1
+        return derivative(c)
+    end
+    return derivative(c, vars[ind])
+end
+
 
 function diff(pol_ :: OrePoly, ind_ :: Integer, A ::OreAlg)
     pol = deepcopy(pol_)
     ind = ind_
     if ind <= A.nrdv 
         cos = coeffs(pol)
-        if ctx(A) isa MRatFunCtx
-            for i in 1:length(cos)
-                cos[i] = derivative(cos[i], ctx(A).vars[ind])
-            end
-        else 
-            for i in 1:length(cos)
-                cos[i] = derivative(cos[i])
-            end
+        for i in 1:length(cos)
+            cos[i] = coeff_derivative(cos[i], ind, A)
         end
         normalize!(pol,A)
         return pol 
@@ -334,16 +376,16 @@ function diff(pol_ :: OrePoly, ind_ :: Integer, A ::OreAlg)
 end
 
 
-function denominator(p :: OrePoly,A:: OreAlg)
+function denominator(p :: OrePoly, A:: OreAlg; normalize::Val{B} = Val(true)) where {B}
     if length(p) == 0 
         return ctx(A).R(1)
     end
-    return lcm([Nemo.denominator(c,false) for c in coeffs(p)])
+    return lcm([Nemo.denominator(c, B) for c in coeffs(p)])
 end
 
-function denominator(p :: OrePoly)
+function denominator(p :: OrePoly; normalize::Val{B} = Val(true)) where {B}
     # it assumes lengtp(p) > 0
-    return lcm([Nemo.denominator(c,false) for c in coeffs(p)])
+    return lcm([Nemo.denominator(c, B) for c in coeffs(p)])
 end
 
 function clear_denominators!(p :: OrePoly, A :: OreAlg)
@@ -359,6 +401,27 @@ function clear_denominators!(v :: Vector{OrePoly{T,M}}, A :: OreAlg) where {T,M}
     for i in 1:length(v)
         clear_denominators!(v[i],A)
     end
+end
+
+function content(p::OrePoly{T,M}, A::OreAlg{T,C,MA,O}) where {T,M,MA,O,C<:RingCtx{T,<:Any}}
+    isempty(p) && return one(ctx(A))
+    g = coeff(p, 1)
+    for i in 2:length(p)
+        g = gcd(g, coeff(p, i), ctx(A))
+        isone(g, ctx(A)) && break
+    end
+    return g
+end
+
+function primitive_part!(p::OrePoly{T,M}, A::OreAlg{T,C,MA,O}) where {T,M,MA,O,C<:RingCtx{T,<:Any}}
+    isempty(p) && return p
+    g = content(p, A)
+    isone(g, ctx(A)) && return p
+    cs = coeffs(p)
+    @inbounds for i in eachindex(cs)
+        divexact!(cs[i], g, ctx(A))
+    end
+    return p
 end
 
 

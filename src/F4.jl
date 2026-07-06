@@ -20,7 +20,7 @@ f4_trace() = F4Trace(Vector{Tuple{Int64,Int64}}[])
 
 
 # All data that we need during the F4 algorithm
-mutable struct PartialGB{T,M, Alg,B,C,D}
+mutable struct PartialGB{T,M, Alg,A,B,C,D,E,F}
     # must be indexed monomials (ie monomials are indices)
 
     alg :: Alg 
@@ -29,16 +29,16 @@ mutable struct PartialGB{T,M, Alg,B,C,D}
     newrels :: Vector{OrePoly{T,M}}        # new relations for which the S-pairs are not yet generated
     candidates :: Vector{OrePoly{T,M}}     # halfpairs to be reduced
     spairs :: Vector{Spair{M}} # spairs
-    param :: F4Param{B,C,D}
+    param :: F4Param{A,B,C,D,E,F}
     geob :: GeoBucket{T, M}
-    function PartialGB{T, M, Alg,B,C,D}(
-        A :: Alg, generators :: Vector{OrePoly{T,M}},param :: F4Param{B,C,D}
-    ) where {T, M, Alg <: OreAlg,B,C,D}
+    function PartialGB{T, M, Alg,A,B,C,D,E,F}(
+        alg :: Alg, generators :: Vector{OrePoly{T,M}},param :: F4Param{A,B,C,D,E,F}
+    ) where {T, M, Alg <: OreAlg,A,B,C,D,E,F}
         gens = copy(generators)
         filter!(p -> !isempty(p), gens)
-        geob = GeoBucket(zero(A))
-        gens2 = interreduce(A,gens,param,geob)
-        new(A, OrePoly{T,M}[],
+        geob = GeoBucket(zero(alg))
+        gens2 = interreduce(alg,gens,param,geob)
+        new(alg, OrePoly{T,M}[],
             BitSet(), gens2, OrePoly{T,M}[], Vector{Spair{M}}(),param,geob)
     end
 end
@@ -63,8 +63,8 @@ function spair(pgb :: PartialGB, i :: Int, j :: Int,)
 end
 
 
-function partialgb(generators, A :: OreAlg,param :: F4Param{B,C,D}) where{B,C,D}
-    PartialGB{eltype_co(A), eltype_mo(A), typeof(A),B,C,D}(A, generators,param)
+function partialgb(generators, A :: OreAlg, param :: F4Param{P1,P2,P3,P4,P5,P6}) where{P1,P2,P3,P4,P5,P6}
+    PartialGB{eltype_co(A), eltype_mo(A), typeof(A),P1,P2,P3,P4,P5,P6}(A, generators,param)
 end
 
 
@@ -165,7 +165,11 @@ function generatespairs!(pgb :: PartialGB{M,T}) where {M,T}
 
     for rel in pgb.newrels
         isempty(rel) && continue
-        makemonic!(rel,pgb.alg)
+        if ctx(pgb.alg) isa RingCtx
+            primitive_part!(rel, pgb.alg)
+        else
+            makemonic!(rel, pgb.alg)
+        end
         pushrel!(pgb, rel)
     end
     empty!(pgb.newrels)
@@ -179,7 +183,11 @@ function add_new_rels!(pgb :: PartialGB{M,T}) where {M,T}
         isempty(rel) && continue
         debug(pgb.param) && @debug "New relation with leading monomial $(mon(rel,1).exp)"
 
-        makemonic!(rel,pgb.alg)
+        if ctx(pgb.alg) isa RingCtx
+            primitive_part!(rel, pgb.alg)
+        else
+            makemonic!(rel, pgb.alg)
+        end
 
         push!(pgb.basis, rel)
         lmrel = mon(rel,1)
@@ -442,7 +450,11 @@ function Buchberger2(gens_ :: Vector{OrePoly{K,M}}, A :: Alg;param ::F4Param = f
         spol = div2!(spol,pgb.basis,A,param=param)
 
         if !iszero(spol)
-            makemonic!(spol,A)
+            if ctx(A) isa RingCtx
+                primitive_part!(spol, A)
+            else
+                makemonic!(spol, A)
+            end
             push!(pgb.newrels,spol) 
         end
 

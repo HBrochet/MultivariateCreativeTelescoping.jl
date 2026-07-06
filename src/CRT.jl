@@ -1,5 +1,16 @@
 struct CRTParam{A,B} end 
 
+@inline function _modp_args(ctxA::RatFunCtx, prime::Int, A::OreAlg, args...)
+    nA = change_alg_char_ratfun(prime, A)
+    R = Native.GF(prime)
+    return nA, change_coefficient_field(R, nA, args...)
+end
+
+@inline function _modp_args(ctxA::QQCtx, prime::Int, A::OreAlg, args...)
+    nA = change_alg_char_QQ(prime, A)
+    return nA, change_coefficient_field(nA, args...)
+end
+
 function crt_param(;tracer :: Val{A} = Val(false),
                     comp :: Val{B} = Val(:medium)
                     ) where {A,B}
@@ -10,41 +21,220 @@ tracer(p :: CRTParam{A,B}) where {A,B} = A
 comp(p :: CRTParam{A,B}) where {A,B} = B
 
 
+@inline _support_signature(p::OrePoly, ::OreAlg) = mons(p)
+@inline _support_signature(v::Vector{OrePoly{T,M}}, ::OreAlg) where {T,M}= [mons(p) for p in v]
+@inline _support_signature(tr::F4Trace, ::OreAlg) = tr.spairs
+@inline function _support_signature(d::Dict{M,OrePoly{T,M}}, A::OreAlg) where {T,M}
+    ks = collect(keys(d))
+    sort!(ks, order = order(A))
+    return [(k, mons(d[k])) for k in ks]
+end
+@inline _support_signature(t::Tuple{Dict{M,OrePoly{T,M}},OrePoly{T,M}}, A::OreAlg) where {T,M} = (_support_signature(t[1], A), _support_signature(t[2], A))
+
+
+function majority_test!(res_ev::Vector{T}, primes_::Vector{Int}, A::OreAlg) where {T}
+    n = length(res_ev)
+    if n < 3
+        error("not enough primes for the majority test")
+    end
+    first_sig = _support_signature(res_ev[1], A)
+    counts = Dict{typeof(first_sig),Int}()
+    counts[first_sig] = 1
+    for i in 2:n
+        sig = _support_signature(res_ev[i], A)
+        counts[sig] = get(counts, sig, 0) + 1
+    end
+    maxsig = length(res_ev)
+    maxcount = 0
+    for (sig, c) in counts
+        if c > maxcount
+            maxsig = sig
+            maxcount = c
+        end
+    end
+    if maxcount * 2 <= n
+        error("too many bad primes for the majority test")
+    end
+    keep = Vector{Bool}(undef, n)
+    @inbounds for i in 1:n
+        keep[i] = _support_signature(res_ev[i], A) == maxsig
+    end
+    if all(keep)
+        return length(primes_)
+    end
+    new_res = eltype(res_ev)[]
+    new_primes = Int[]
+    @inbounds for i in 1:n
+        if keep[i]
+            push!(new_res, res_ev[i])
+            push!(new_primes, primes_[i])
+        end
+    end
+    empty!(res_ev)
+    append!(res_ev, new_res)
+    empty!(primes_)
+    append!(primes_, new_primes)
+    return length(primes_)
+end
+
 
 # the tracer assume f can be called with f(...;tracer=Val(true)) to learn and return a trace  
 # and f(trace,...) to apply the trace at subsequent computations
 
-function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam = crt_param())
+function _crt_compute_prime(f::F, ctxA, prime::Int, A::OreAlg, args...) where {F<:Function}
+    nA, mod_args = _modp_args(ctxA, prime, A, args...)
+    return f(mod_args...)
+end
+
+function _crt_compute_prime_with_trace(f::F, trace, ctxA, prime::Int, A::OreAlg, args...) where {F<:Function}
+    nA, mod_args = _modp_args(ctxA, prime, A, args...)
+    return f(trace, mod_args...)
+end
+
+function _crt_learn_trace_prime(f::F, ctxA, prime::Int, A::OreAlg, args...) where {F<:Function}
+    nA, mod_args = _modp_args(ctxA, prime, A, args...)
+    return f(mod_args...; tracer = Val(true))
+end
+
+function _crt_learn_trace_prime_batch(
+    f::F,
+    ctxA,
+    prime_indices::UnitRange{Int},
+    A::OreAlg,
+    args...;
+    parallel::Bool = false,
+) where {F<:Function}
+    if !parallel || length(prime_indices) == 1
+        return [
+            begin
+                prime = primes[i]
+                res, trace = _crt_learn_trace_prime(f, ctxA, prime, A, args...)
+                (i, prime, res, trace)
+            end
+            for i in prime_indices
+        ]
+    end
+
+    tasks = [
+        Threads.@spawn begin
+            prime = primes[i]
+            res, trace = _crt_learn_trace_prime(f, ctxA, prime, A, args...)
+            (i, prime, res, trace)
+        end
+        for i in prime_indices
+    ]
+    return fetch.(tasks)
+end
+
+function _crt_compute_prime_batch(
+    f::F,
+    ctxA,
+    prime_indices::UnitRange{Int},
+    A::OreAlg,
+    args...;
+    trace = nothing,
+    parallel::Bool = false,
+) where {F<:Function}
+    if !parallel || length(prime_indices) == 1
+        return [
+            begin
+                prime = primes[i]
+                res = trace === nothing ?
+                    _crt_compute_prime(f, ctxA, prime, A, args...) :
+                    _crt_compute_prime_with_trace(f, trace, ctxA, prime, A, args...)
+                (i, prime, res)
+            end
+            for i in prime_indices
+        ]
+    end
+
+    tasks = [
+        Threads.@spawn begin
+            prime = primes[i]
+            res = trace === nothing ?
+                _crt_compute_prime(f, ctxA, prime, A, args...) :
+                _crt_compute_prime_with_trace(f, trace, ctxA, prime, A, args...)
+            (i, prime, res)
+        end
+        for i in prime_indices
+    ]
+    return fetch.(tasks)
+end
+
+function compute_with_CRT(
+    f::F,
+    A::OreAlg,
+    args...;
+    param::CRTParam = crt_param(),
+    parallel::Bool = false,
+    batch_size::Integer = Threads.nthreads(),
+) where {F<:Function}
+    batch_size = max(1, Int(batch_size))
+    parallel = parallel && batch_size > 1 && Threads.nthreads() > 1
     nprime = 1
     globalstats.counters[:number_primes] += 1
-    primes_ = [primes[1]]
+    primes_ = Int[primes[1]]
     prime = primes[1]
-    bound = 1
-    bnd = 1
+    bound = comp(param) == :slow ? 3 : 2
+
+    bnd = 3
     succeeded = false # after reconstructing the result we try one more prime 
 
-    if ctx(A) isa RatFunCtx
-        nA = change_alg_char_ratfun(prime,A)
-        R = Native.GF(prime)
-        if tracer(param)
-            tmp, trace = f(change_coefficient_field(R,nA, args...)...;tracer=Val(true))
+    ctxA = ctx(A)
+    if tracer(param)
+        if parallel
+            globalstats.counters[:number_primes] += 2
+            empty!(primes_)
+            nprime = 3
+            @debug "learning the trace for primes 1:3"
+            batch = _crt_learn_trace_prime_batch(
+                f,
+                ctxA,
+                1:3,
+                A,
+                args...;
+                parallel = true,
+            )
+            res_modp = typeof(batch[1][3])[]
+            tab_tr = typeof(batch[1][4])[]
+            for (_, prime, tmp, trace) in batch
+                push!(primes_, prime)
+                push!(res_modp, tmp)
+                push!(tab_tr, trace)
+            end
+        else
+            nA, mod_args = _modp_args(ctxA, prime, A, args...)
+            tmp, trace = f(mod_args...;tracer=Val(true))
             res_modp = [tmp]
-        else 
-            res_modp = [f(change_coefficient_field(R,nA, args...)...)]
+            tab_tr = [trace]
+            for _ in 2:3
+                nprime += 1
+                globalstats.counters[:number_primes] += 1
+                prime = primes[nprime]
+                push!(primes_, prime)
+                @debug "computing the function for $(nprime)th prime"
+                nA, mod_args = _modp_args(ctxA, prime, A, args...)
+                tmp, trace = f(mod_args...;tracer=Val(true))
+                push!(res_modp, tmp)
+                push!(tab_tr, trace)
+            end
         end
-    elseif ctx(A) isa QQCtx
-        nA = change_alg_char_QQ(prime,A)
-        if tracer(param)
-            tmp, trace = f(change_coefficient_field(nA, args...)...;tracer=Val(true))
-            res_modp = [tmp]
-        else 
-            res_modp = [f(change_coefficient_field(nA, args...)...)]
+        majority_test!(tab_tr,[1,2,3], A)
+        if length(tab_tr) < 2 
+            error("too many bad primes")
         end
+        trace = tab_tr[1]
+    else 
+        nA, mod_args = _modp_args(ctxA, prime, A, args...)
+        res_modp = [f(mod_args...)]
     end
-    let prev_res
+
+    local prev_res
     while true 
         if succeeded 
             @debug "trying to reconstruct result via CRT"
+            majority_test!(res_modp, primes_, A)
+
             res = crt(res_modp, primes_, A)
             clear_denominators!(res,A)
             if res == prev_res 
@@ -53,8 +243,9 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam =
                 @debug "reconstructions are not consistent, trying more primes"
                 prev_res = res
             end
-        elseif nprime == bnd
+        elseif nprime >= bnd
             @debug "trying to reconstruct result via CRT"
+            majority_test!(res_modp, primes_, A)
             try
                 prev_res = crt(res_modp, primes_, A)
                 clear_denominators!(prev_res,A)
@@ -74,9 +265,9 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam =
             end
         end
         # if nprime == 100
-        #     # for i in 1:5 
-        #     #     prettyprint(res_modp[i],A)
-        #     # end
+        #     for i in 1:5 
+        #         prettyprint(res_modp[i],A)
+        #     end
         #     prev_res = crt(res_modp, primes_, A)
         #     clear_denominators!(prev_res,A)
         #     succeeded = true 
@@ -84,98 +275,112 @@ function compute_with_CRT(f :: Function, A :: OreAlg, args...;param ::CRTParam =
         #     error("fin")
         # end
 
-        nprime += 1 
-        globalstats.counters[:number_primes] += 1
-        prime = primes[nprime]
-        push!(primes_,prime)
-        @debug "computing ggd for $(nprime)th prime"
-        if ctx(A) isa RatFunCtx
-            nA = change_alg_char_ratfun(prime,A)
-            R = Native.GF(prime)
-            if tracer(param)
-                push!(res_modp, f(trace,change_coefficient_field(R,nA, args...)...))
-            else 
-                push!(res_modp, f(change_coefficient_field(R,nA, args...)...))
-            end
-        elseif ctx(A) isa QQCtx
-            nA = change_alg_char_QQ(prime,A)
-            if tracer(param)
-                push!(res_modp, f(trace,change_coefficient_field(nA,args...)...))
-            else 
-                push!(res_modp, f(change_coefficient_field(nA,args...)...))
-            end
+        next_nprime = nprime + 1
+        n_to_compute = succeeded ? 1 : (parallel ? min(batch_size, max(1, bnd - nprime)) : 1)
+        last_nprime = nprime + n_to_compute
+        globalstats.counters[:number_primes] += n_to_compute
+        @debug "computing the function for primes $(next_nprime):$(last_nprime)"
+        batch = _crt_compute_prime_batch(
+            f,
+            ctxA,
+            next_nprime:last_nprime,
+            A,
+            args...;
+            trace = tracer(param) ? trace : nothing,
+            parallel = parallel,
+        )
+        for (_, prime, res) in batch
+            push!(primes_, prime)
+            push!(res_modp, res)
         end
-    end
+        nprime = last_nprime
     end
 end
 
 
 function crt(vec :: Vector{OrePoly{K,M}}, primes_ :: Vector{Int}, A :: OreAlg) where {K <: RatFunModp, M}
+    nvec = length(vec)
+    ncoeff = length(vec[1])
+    ctxA = ctx(A)
     primes = [ZZ(prime) for prime in primes_]
-    cos = RatFunQQ[]
     prodp = prod(primes)
-    for i in 1:length(vec[1])
-        num = zero(ctx(A).F)
-        term1 = Nemo.numerator(coeff(vec[1],i))
+    cos = Vector{RatFunQQ}(undef, ncoeff)
+    cs = Vector{typeof(ZZ(0))}(undef, nvec)
+    for i in 1:ncoeff
+        num = zero(ctxA.F)
+        term1 = Nemo.numerator(coeff(vec[1], i))
         for j in 1:length(term1)
-            cs = [ZZ(Nemo.coeff(Nemo.numerator(coeff(vec[k],i)), j).data) for k in 1:length(vec)]
-            c = Nemo.crt(cs, primes)
-            c = Nemo.reconstruct(c,prodp)
-            num += ctx(A).F(ctx(A).R([Nemo.numerator(c)],[exponent_vector(term1,j)])) / ctx(A).F(Nemo.denominator(c))
+            @inbounds for k in 1:nvec
+                cs[k] = ZZ(Nemo.coeff(Nemo.numerator(coeff(vec[k], i)), j).data)
+            end
+            c = Nemo.reconstruct(Nemo.crt(cs, primes), prodp)
+            num += ctxA.F(ctxA.R([Nemo.numerator(c)], [exponent_vector(term1, j)])) / ctxA.F(Nemo.denominator(c))
         end
 
-        den = zero(ctx(A).F)
-        term1 = Nemo.denominator(coeff(vec[1],i))
+        den = zero(ctxA.F)
+        term1 = Nemo.denominator(coeff(vec[1], i))
         for j in 1:length(term1)
-            cs = [ZZ(Nemo.coeff(Nemo.denominator(coeff(vec[k],i)), j).data) for k in 1:length(vec)]
-            c = Nemo.crt(cs, primes)
-            c = Nemo.reconstruct(c,prodp)
-            den += ctx(A).F(ctx(A).R([Nemo.numerator(c)],[exponent_vector(term1,j)])) / ctx(A).F(Nemo.denominator(c))
+            @inbounds for k in 1:nvec
+                cs[k] = ZZ(Nemo.coeff(Nemo.denominator(coeff(vec[k], i)), j).data)
+            end
+            c = Nemo.reconstruct(Nemo.crt(cs, primes), prodp)
+            den += ctxA.F(ctxA.R([Nemo.numerator(c)], [exponent_vector(term1, j)])) / ctxA.F(Nemo.denominator(c))
         end
 
-        push!(cos, num/den)
+        cos[i] = num / den
     end
-    return OrePoly(cos,deepcopy(mons(vec[1])))
+    return OrePoly(cos, deepcopy(mons(vec[1])))
 end
 
 function crt(vec :: Vector{OrePoly{K,M}}, primes_ :: Vector{Int}, A :: OreAlg) where {K <: UnivRatFunModp, M}
+    nvec = length(vec)
+    ncoeff = length(vec[1])
+    ctxA = ctx(A)
     primes = [ZZ(prime) for prime in primes_]
-    cos = UnivRatFunQQ[]
     prodp = prod(primes)
-    for i in 1:length(vec[1])
-        num = zero(ctx(A).F)
-        term1 = numerator(coeff(vec[1],i),false)
+    cos = Vector{UnivRatFunQQ}(undef, ncoeff)
+    cs = Vector{typeof(ZZ(0))}(undef, nvec)
+    for i in 1:ncoeff
+        num = zero(ctxA.F)
+        term1 = numerator(coeff(vec[1], i), false)
         for j in 0:length(term1)-1
-            cs = [ZZ(Nemo.coeff(numerator(coeff(vec[k],i),false), j).data) for k in 1:length(vec)]
-            c = Nemo.crt(cs, primes)
-            c = Nemo.reconstruct(c,prodp)
-            num += ctx(A).F(numerator(c,false)*ctx(A).vars[1]^j) / ctx(A).F(Nemo.denominator(c,false))
+            @inbounds for k in 1:nvec
+                cs[k] = ZZ(Nemo.coeff(numerator(coeff(vec[k], i), false), j).data)
+            end
+            c = Nemo.reconstruct(Nemo.crt(cs, primes), prodp)
+            num += ctxA.F(numerator(c, false) * ctxA.vars[1]^j) / ctxA.F(Nemo.denominator(c, false))
         end
 
-        den = zero(ctx(A).F)
-        term1 = Nemo.denominator(coeff(vec[1],i),false)
+        den = zero(ctxA.F)
+        term1 = Nemo.denominator(coeff(vec[1], i), false)
         for j in 0:length(term1)-1
-            cs = [ZZ(Nemo.coeff(Nemo.denominator(coeff(vec[k],i),false), j).data) for k in 1:length(vec)]
-            c = Nemo.crt(cs, primes)
-            c = Nemo.reconstruct(c,prodp)
-            den += ctx(A).F(numerator(c,false)*ctx(A).vars[1]^j) / ctx(A).F(Nemo.denominator(c,false))
+            @inbounds for k in 1:nvec
+                cs[k] = ZZ(Nemo.coeff(Nemo.denominator(coeff(vec[k], i), false), j).data)
+            end
+            c = Nemo.reconstruct(Nemo.crt(cs, primes), prodp)
+            den += ctxA.F(numerator(c, false) * ctxA.vars[1]^j) / ctxA.F(Nemo.denominator(c, false))
         end
 
-        push!(cos, num/den)
+        cos[i] = num / den
     end
-    return OrePoly(cos,deepcopy(mons(vec[1])))
+    return OrePoly(cos, deepcopy(mons(vec[1])))
 end
 
 function crt(vec :: Vector{OrePoly{K,M}}, primes_ :: Vector{Int},:: OreAlg{T,C,M,O}) where {K,M,T,O,C<: QQCtx}
+    nvec = length(vec)
+    ncoeff = length(vec[1])
     primes = [ZZ(prime) for prime in primes_]
-    cos = Vector{QQFieldElem}(undef,length(vec[1]))
+    cos = Vector{QQFieldElem}(undef, ncoeff)
     prodp = prod(primes)
-    for i in 1:length(vec[1])
-        cs = [ZZ(coeff(vec[k],i)) for k in 1:length(vec)]
+    cs = Vector{typeof(ZZ(0))}(undef, nvec)
+    for i in 1:ncoeff
+        @inbounds for k in 1:nvec
+            cs[k] = ZZ(coeff(vec[k], i))
+        end
         c = Nemo.crt(cs, primes)
-        cos[i] = Nemo.reconstruct(c,prodp)
+        cos[i] = Nemo.reconstruct(c, prodp)
     end
-    return OrePoly(cos,deepcopy(mons(vec[1])))
+    return OrePoly(cos, deepcopy(mons(vec[1])))
 end
 
 function crt(vec :: Vector{Vector{OrePoly{K,M}}}, primes :: Vector{Int}, A :: OreAlg) where {K, M}

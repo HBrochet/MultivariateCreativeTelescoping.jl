@@ -9,6 +9,18 @@ include("typeorealgebra.jl")
 include("parseinputoutput.jl")
 include("orepolyaddmul.jl")
 
+# dfinite parser 
+include("dfinite_parser.jl")
+include("ann_poly_power.jl")
+include("ann_comp_right_rat.jl")
+include("ann_comp_right_alg.jl")
+include("minimal_polynomial.jl")
+include("module_groebner.jl")
+include("picard_fuchs.jl")
+
+# include("crt.jl")
+# include("cauchy_interpolation.jl")
+
 @testset "unused type" begin
     @test isempty(detect_unbound_args(MultivariateCreativeTelescoping)) 
 end
@@ -117,6 +129,18 @@ end
     res2 = parse_OrePoly("t*dt-1",A)
     @test res == res2
 
+    A = OreAlg(order = "lex dt > grevlex x dx",
+               ratvars = ["m"],
+               ratdiffvars = (["t"],["dt"]),
+               poldiffvars = (["x"],["dx"]))
+    ann0, A0 = dfinite_expr_to_ann("1/(m^2-x*(1-x)*t^2)", ratvars = ["m"])
+    ann = map_algebras(ann0, A0, A)
+    init = weyl_closure_init(A)
+    gb = weyl_closure_internal(ann, A, init, wc_param(debug = Val(false)))
+    res = MCT_direct(one(A), gb, A)
+    res2 = parse_OrePoly("(t^3 - 4*t*m^2)*dt + (2*t^2 - 4*m^2)", A)
+    @test res == res2
+
 
     # # SSW3
     # A = OreAlg(order = "lex dt > grevlex x y > grevlex dx dy",ratdiffvars=(["t"],["dt"]),poldiffvars = (["x","y"],["dx","dy"]))
@@ -141,20 +165,80 @@ end
     
 end
 
+@testset "Multi-parameter derivation map" begin
+    A = OreAlg(order = "lex d1 d2 dx x",
+               ratdiffvars = (["t1","t2"],["d1","d2"]),
+               poldiffvars = (["x"],["dx"]))
 
-@testset "Cauchy interpolation" begin 
-    A = OreAlg(order = "lex dt x dx",ratdiffvars=(["t"],["dt"]), poldiffvars=(["x"],["dx"]),char=primes[1])
+    gb = [parse_OrePoly("d1-1",A),
+          parse_OrePoly("d2-1",A)]
 
-    p = parse_OrePoly("t",A)
+    res = der_red_map_many(A, one(A), gb, mct_param())
 
-    function foo(A::OreAlg,p :: OrePoly)
-        cs = [mul(c,c,ctx(A)) for c in coeffs(p)]
-        return OrePoly(cs,deepcopy(mons(p)))
+    @test res.dops == ["d1","d2"]
+    @test length(res.red_dts) == 2
+    @test res.red_dts[1] == parse_OrePoly("d1-1",A)
+    @test res.red_dts[2] == parse_OrePoly("d2-1",A)
+    @test res.spol == one(A)
+    @test length(res.basis) == 1
+    @test makemon(-1,A) in res.basis
+    @test res.der_maps[1][makemon(-1,A)] == one(A)
+    @test res.der_maps[2][makemon(-1,A)] == one(A)
+
+    function column_to_poly(mat, basis, j, A)
+        cs = eltype_co(A)[]
+        ms = eltype_mo(A)[]
+        for i in 1:length(basis)
+            if !iszero(mat[i,j])
+                push!(cs, mat[i,j])
+                push!(ms, basis[i])
+            end
+        end
+        p = OrePoly(cs,ms)
+        normalize!(p,A)
+        return p
     end
-    
-    res = compute_with_cauchy_interpolation(foo,A,p)
-    @test res == parse_OrePoly("t^2",A)
+
+    for i in 1:length(res.der_maps)
+        for j in 1:length(res.basis)
+            @test column_to_poly(res.der_mats[i], res.basis, j, A) == res.der_maps[i][res.basis[j]]
+        end
+    end
 end
+
+@testset "Multi-parameter direct LDE system" begin
+    A = OreAlg(order = "lex d1 d2 dx x",
+               ratdiffvars = (["t1","t2"],["d1","d2"]),
+               poldiffvars = (["x"],["dx"]))
+
+    gb = [parse_OrePoly("d1-1",A),
+          parse_OrePoly("d2-1",A)]
+
+    red = der_red_map_many(A, one(A), gb, mct_param())
+    sys = find_LDE_direct_many(red.der_maps, red.spol, A)
+
+    @test length(sys) == 2
+    @test parse_OrePoly("d1-1", A) in sys
+    @test parse_OrePoly("d2-1", A) in sys
+end
+
+@testset "MCTMany rational integrand example" begin
+    A = OreAlg(order = "lex d1 d2 dx x",
+               ratdiffvars = (["t1","t2"],["d1","d2"]),
+               poldiffvars = (["x"],["dx"]))
+
+    # I(t1,t2) = \int_gamma x/(t1*t2-x) dx
+    gb = [parse_OrePoly("t1*d1 + x*dx", A),
+          parse_OrePoly("t2*d2 + x*dx", A),
+          parse_OrePoly("x*(t1*t2-x)*dx - t1*t2", A)]
+
+    sys = MCTMany(one(A), gb, A)
+
+    @test length(sys) == 2
+    @test parse_OrePoly("t1*d1 - 1", A) in sys
+    @test parse_OrePoly("t2*d2 - 1", A) in sys
+end
+
 
 ### test for mri 
 

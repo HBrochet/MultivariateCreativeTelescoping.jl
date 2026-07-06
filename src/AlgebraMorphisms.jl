@@ -221,7 +221,7 @@ end
 
 
 function change_coefficient_field(R :: Ring,A :: OreAlg, args...)
-    return (change_coefficient_field(R,arg,A) for arg in args)
+    return map(arg -> change_coefficient_field(R,arg,A), args)
 end
 
 function change_coefficient_field(:: Ring, vA ::OreAlg, A ::OreAlg)
@@ -231,7 +231,7 @@ end
 
 # change coefficient field from QQ to modp 
 function change_coefficient_field(A :: OreAlg, args...)
-    return (change_coefficient_field(arg,A) for arg in args)
+    return map(arg -> change_coefficient_field(arg,A), args)
 end
 
 function change_coefficient_field(vA ::OreAlg, A ::OreAlg)
@@ -265,6 +265,27 @@ end
 
 function change_coefficient_field(a :: Any,:: OreAlg)
     return a 
+end
+
+function evaluate(pol :: OrePoly{T,M}, svar::Union{String,Symbol}, value) where {T<:RatFun,M}
+    length(pol) == 0 && return pol
+
+    F = parent(coeff(pol,1))
+    new_coeffs = T[]
+    new_mons = M[]
+
+    @inbounds for i in 1:length(pol)
+        c = F(evaluate(coeff(pol,i), svar, value))
+        iszero(c) && continue
+        push!(new_coeffs, c)
+        push!(new_mons, mon(pol, i))
+    end
+
+    return OrePoly(new_coeffs, new_mons)
+end
+
+function evaluate(g :: Vector{OrePoly{T,M}}, svar::Union{String,Symbol}, value) where {T<:RatFun,M}
+    return [evaluate(p, svar, value) for p in g]
 end
 
 """
@@ -454,7 +475,7 @@ function evaluate_coeff(pol :: OrePoly, v :: Vector{K}, A :: OreAlg) where K
     nc = Vector{eltype_co(A)}(undef,len)
     ct = ctx(A)
     for i in 1:len 
-        nc[i] = convertn(evaluate(cos[i],v).data,ct)
+        nc[i] = convertn(evaluate(cos[i], v), ct)
     end
     return OrePoly(nc,mons(pol))
 end
@@ -531,11 +552,11 @@ end
 # end
 
 function evaluate_parameter(p ::Int, ind :: Int, A :: OreAlg, args...)
-    return (evaluate_parameter(arg,p,ind,A) for arg in args)
+    return map(arg -> evaluate_parameter(arg,p,ind,A), args)
 end
 
 function evaluate_parameter(p ::Int, A :: OreAlg, args...)
-    return (evaluate_parameter(arg,p,1,A) for arg in args)
+    return map(arg -> evaluate_parameter(arg,p,1,A), args)
 end
 
 function evaluate_parameter_cbl(cbl :: UnivRatFunModp ,randpoints :: Vector{Int},A :: OreAlg)
@@ -579,6 +600,7 @@ function new_rand_points(vec :: Vector{Int}, p :: Int,len :: Int)
     res = Int[]
     while l<len  
         point = mod(rand(Int),p)
+        # point = p - 10000 - length(res)
         if !(point in vec) && !(point in res)
             push!(res,point)
             l += 1
@@ -703,4 +725,3 @@ end
 # function evaluate_parameter(a :: Any,:: Int,:: OreAlg)
 #     return a 
 # end
-

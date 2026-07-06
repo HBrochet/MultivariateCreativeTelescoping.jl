@@ -5,10 +5,9 @@ using Combinatorics
 using Nemo
 using DataStructures
 using ExportAll
+using ParamPunPam
 
 using FLINT_jll: libflint
-
-global ord_ctr = 0; # used to create new types with metaprogramming
 
 include("globalstats.jl")
 include("primes.jl")
@@ -30,6 +29,7 @@ include("Buchberger.jl")
 
 include("symbolicpp.jl")
 include("elimination.jl")
+include("fglm.jl")
 include("F4.jl")
 
 
@@ -37,18 +37,33 @@ include("TypeSigPair.jl")
 include("F5.jl")
 
 include("WeylClosure.jl")
+include("WeylClosureSingleTNoMulDi.jl")
 
 include("echelon_form.jl")
 include("Reductions.jl")
 include("RepresentativeInIntMod.jl")
 include("DerivRedMap.jl")
+include("DerivRedMapMany.jl")
 include("MCT.jl")
+include("MCTMany.jl")
+include("Picard_fuchs.jl")
 
 include("AlgebraMorphisms.jl")
 include("CRT.jl")
 include("CauchyInterpolation.jl")
+include("Picard_fuchs_crt.jl")
+include("ModuleGroebner.jl")
 
 include("annfs.jl")
+include("dfinite_parser/database_LDE.jl")
+include("dfinite_parser/ann_sum_prod.jl")
+include("dfinite_parser/minimal_polynomial.jl")
+include("dfinite_parser/dfinite_algebraic_leaf.jl")
+include("dfinite_parser/ann_comp_right_rat.jl")
+include("dfinite_parser/ann_comp_right_alg.jl")
+include("dfinite_parser/dfinite_hyperexp_division.jl")
+include("dfinite_parser/ann_poly_power.jl")
+include("dfinite_parser/dfinite_parser.jl")
 include("testfunctions.jl")
 # include("IndicialEqs.jl")
 

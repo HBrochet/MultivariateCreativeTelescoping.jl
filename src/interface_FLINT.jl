@@ -31,20 +31,38 @@ function evaluate(pol :: fpMPolyRingElem, v:: Vector{fpFieldElem})
 end
 
 
-# slong _nmod_poly_hgcd(mp_ptr *M, slong *lenM, mp_ptr A, slong *lenA, mp_ptr B, slong *lenB, mp_srcptr a, slong lena, mp_srcptr b, slong lenb, nmod_t mod)
-# function half_gcd(a :: fpPolyRingElem, b :: fpPolyRingElem)
-#     p = parent(a)
-#     A = p()
-#     B = p()
+function half_gcd_flint(a :: fpPolyRingElem, b :: fpPolyRingElem)
+    R = parent(a)
+    n = Nemo.degree(a)
+    m = div(n,2) + isodd(n)
+    if iszero(b) || Nemo.degree(b) < m
+        return SMatrix{2,2,fpPolyRingElem}(R(1), R(0), R(0), R(1))
+    end
 
-#     lenM = UInt(4)
-#     M = Vector{fpPolyRingElem}(undef,4) 
-#     for i in 1:4 
-#         M[i] = p()
-#     end
+    m11 = R()
+    m12 = R()
+    m21 = R()
+    m22 = R()
+    A = R()
+    B = R()
 
-#     ccall((:_nmod_poly_hgcd, libflint), 
-#     UInt,
-#     (Ref{typeof(M)},Ptr{UInt},Ref{fpPolyRingElem},Ptr{UInt},Ref{fpPolyRingElem},Ptr{UInt},Ref{fpPolyRingElem},Ptr{UInt},Ref{fpPolyRingElem},Ptr{UInt},Ptr{UInt} ),
-#     M  ,lenM,A,v,len)
+    @ccall libflint.nmod_poly_hgcd(
+        m11::Ref{fpPolyRingElem},
+        m12::Ref{fpPolyRingElem},
+        m21::Ref{fpPolyRingElem},
+        m22::Ref{fpPolyRingElem},
+        A::Ref{fpPolyRingElem},
+        B::Ref{fpPolyRingElem},
+        a::Ref{fpPolyRingElem},
+        b::Ref{fpPolyRingElem}
+    )::Int
 
+    # FLINT returns M, A, B such that [a; b] = M * [A; B].
+    # We return the inverse so half_gcd matches the Julia convention.
+    det = m11*m22 - m12*m21
+    if iszero(det)
+        error("nmod_poly_hgcd returned a singular matrix")
+    end
+    invdet = inv(det)
+    return SMatrix{2,2,fpPolyRingElem}(invdet*m22, invdet*(-m21), invdet*(-m12), invdet*m11)
+end

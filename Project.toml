@@ -1,6 +1,6 @@
 name = "MultivariateCreativeTelescoping"
 uuid = "a544615c-5478-485f-b703-83893a5a3b3b"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Hadrien Brochet <hadrien.brochet@inria.fr> and contributors"]
 
 [deps]
@@ -9,6 +9,7 @@ DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 ExportAll = "ad2082ca-a69e-11e9-38fa-e96309a31fe4"
 FLINT_jll = "e134572f-a0d5-539d-bddf-3cad8db41a82"
 Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
+ParamPunPam = "3e851597-e36f-45a9-af0a-b7781937992f"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
@@ -16,6 +17,7 @@ Combinatorics = "1"
 DataStructures = "0.18, 0.19"
 ExportAll = "0.1"
 Nemo = "0.49, 0.50, 0.51, 0.52, 0.53, 0.56"
+ParamPunPam = "0.5.7"
 StaticArrays = "1"
 julia = "1.10"
 
