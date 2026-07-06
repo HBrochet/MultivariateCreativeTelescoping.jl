@@ -41,7 +41,8 @@ function red_dt_tail(red_dt :: OrePoly{T,M}, A :: OreAlg{T,C,M,O}) where {T,C,M,
     return L
 end
 
-function der_red_map_precomp_many2(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, A :: OreAlg{T,C,M,O}, geob :: GeoBucket, tmp_poly :: ReuseOrePoly) where {T,C,M,O}
+function der_red_map_precomp_many2(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,M}}, A :: OreAlg{T,C,M,O}, geob :: GeoBucket, tmp_poly :: ReuseOrePoly, homogeneous :: Bool = false; rho::Integer = 1, homogeneous_degree::Integer = 1) where {T,C,M,O}
+    rho_gap = homogeneous ? Int(rho) * (Int(homogeneous_degree) - 1) : Int(rho)
     red_dts = find_red_dts(gb,A)
     Ls = [red_dt_tail(red_dt, A) for red_dt in red_dts]
     red_dts_degx = maximum(red_dt_xgain(red_dt, A) for red_dt in red_dts)
@@ -52,10 +53,9 @@ function der_red_map_precomp_many2(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,
     end
 
     spol = GD_reduction1!(spol,g1,A,geob,tmp_poly)
-    rho = 1
     ll = maximum(sum(mon(p,1)[i] for i in xvars_range(A)) for p in g2)
     s = max(max(red_dts_degx,0),ll)
-    echelon, next_incr = GD_prereduction_init(g2, g1, s + rho, A,geob,tmp_poly)
+    echelon, next_incr = GD_prereduction_init(g2, g1, s + rho_gap, A,geob,tmp_poly)
     spol = reduce_with_echelon!(echelon,spol,A,geob,tmp_poly)
     while true
         done = SortedSet{M}(order(A))
@@ -65,7 +65,7 @@ function der_red_map_precomp_many2(spol :: OrePoly{T,M}, gb :: Vector{OrePoly{T,
         while !isempty(todo)
             m = poplast!(todo)
             m_degx = sum(m[i] for i in xvars_range(A))
-            if m_degx > s + rho
+            if m_degx > s + rho_gap
                 s += 1
                 next_incr = GD_prereduction_increment!(echelon,next_incr,g1,SortedSet{M}(order(A)),A,geob,tmp_poly)
                 spol = reduce_with_echelon!(echelon,spol,A,geob,tmp_poly)
@@ -156,18 +156,19 @@ function der_maps_to_matrices(der_maps :: Vector{Dict{M,OrePoly{T,M}}}, basis ::
 end
 
 """
-    der_red_map_many(A :: OreAlg, spol :: OrePoly, gb :: Vector{OrePoly}, param :: MCTParam = mct_param())
+    der_red_map_many(A :: OreAlg, spol :: OrePoly, gb :: Vector{OrePoly}, param :: MCTParam = mct_param(), homogeneous::Bool = false; rho = 1, homogeneous_degree = 1)
 
 For each parameter derivation in `A.inp.ratdiffvars[2]`, finds a relation with leading monomial
 `d_ti`, computes a common stable monomial basis, then returns the corresponding derivation maps
 and their matrices. The `j`th column of `der_mats[i]` is the image of `basis[j]`.
+In the homogeneous case, `rho` is scaled to `rho * (homogeneous_degree - 1)`.
 """
-function der_red_map_many(A :: OreAlg{T,C,M,O}, spol_ :: OrePoly{T,M}, gb_ :: Vector{OrePoly{T,M}}, param :: MCTParam = mct_param()) where {T,C,M,O}
+function der_red_map_many(A :: OreAlg{T,C,M,O}, spol_ :: OrePoly{T,M}, gb_ :: Vector{OrePoly{T,M}}, param :: MCTParam = mct_param(), homogeneous ::Bool = false; rho::Integer = 1, homogeneous_degree::Integer = 1) where {T,C,M,O}
     gb = deepcopy(gb_)
     spol = deepcopy(spol_)
     geob = GeoBucket(zero(A))
     tmp_poly = ReuseOrePoly(1,A)
-    spol, g1, red_dts, echelon = der_red_map_precomp_many2(spol,gb,A,geob,tmp_poly)
+    spol, g1, red_dts, echelon = der_red_map_precomp_many2(spol,gb,A,geob,tmp_poly,homogeneous; rho = rho, homogeneous_degree = homogeneous_degree)
     der_maps, basis = find_der_red_map_many(spol,g1,red_dts,echelon,A,geob,tmp_poly)
     return (dops = copy(A.inp.ratdiffvars[2]),
             red_dts = red_dts,
