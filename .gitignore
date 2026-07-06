@@ -7,3 +7,6 @@ debugfile.jl
 /.vscode
 /statprof/
 /my_test/
+/.history
+/logs/
+/my_tests/
