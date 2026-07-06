@@ -220,14 +220,14 @@ function saturate2!(A::alg,
 end
 
 function select_reducer(A :: OreAlg,
-               basis :: Vector{OrePoly{K,M}},
-               m :: OreMonVE,
-               :: Val{E}) where {K,M,E}
+	               basis :: Vector{OrePoly{K,M}},
+	               m :: OreMonVE,
+	               method :: Val{E}) where {K,M,E}
     we= 2^31
     j = 0 
     for i in 1:length(basis)
         if divide(mon(basis[i],1),m,A) 
-            w = weight(basis[i],Val(E))
+            w = weight(basis[i], method, A)
             if w <= we
                 j = i 
                 we = w 
@@ -237,15 +237,15 @@ function select_reducer(A :: OreAlg,
     return j
 end
 
-function weight(g :: OrePoly, ::Val{:last}) 
+@inline function weight(g :: OrePoly, ::Val{:last}, A :: OreAlg)
     return 2^31
 end
 
-function weight(g :: OrePoly, :: Val{:shortest})
+@inline function weight(g :: OrePoly, :: Val{:shortest}, A :: OreAlg)
     return length(g)
 end
 
-function weight(g :: OrePoly, :: Val{:elim})
+@inline function weight(g :: OrePoly, :: Val{:elim}, A :: OreAlg)
     w = 0 
     d = sum(mon(g,1)) 
     for m in mons(g) 
@@ -259,7 +259,7 @@ function weight(g :: OrePoly, :: Val{:elim})
     return w 
 end
 
-function weight(g :: OrePoly, :: Val{:elim_coeffsize})
+@inline function weight(g :: OrePoly, :: Val{:elim_coeffsize}, A :: OreAlg)
     w = 0
     d = sum(mon(g,1)) 
     for m in mons(g) 
@@ -270,11 +270,19 @@ function weight(g :: OrePoly, :: Val{:elim_coeffsize})
             w += 1
         end
     end
-    return w*weight(denominator(g)) 
+    if ctx(A) isa RingCtx 
+        return w*weight(coeff(g,1))
+    else # in this case g is normalized
+        return w*weight(denominator(g)) 
+    end
 end
 
-function weight(g :: OrePoly, :: Val{:coeffsize})
-    return weight(denominator(g)) 
+@inline function weight(g :: OrePoly, :: Val{:coeffsize}, A :: OreAlg)
+    if ctx(A) isa RingCtx 
+        return weight(coeff(g,1))
+    else # in this case g is normalized
+        return weight(denominator(g)) 
+    end
 end
 
 
@@ -350,7 +358,11 @@ function f4matrix(A::alg,
             row = rows[p]
             lc = coeff(row, 1)
             if !isone(lc,ctx(A))
-                makemonic!(row,A)
+                if ctx(A) isa RingCtx
+                    primitive_part!(row, A)
+                else
+                    makemonic!(row, A)
+                end
             end
         end
     end
@@ -458,26 +470,27 @@ end
 
 
 function saturate_lm!(basis :: Vector{OrePoly{T,M}},
-                      rows :: Vector{OrePoly{T,M}},
-                      todo :: Set{M}, 
-                      done ::Set{M}, 
+	                      rows :: Vector{OrePoly{T,M}},
+	                      todo :: Set{M}, 
+	                      done ::Set{M}, 
                       A :: OreAlg, 
                       l :: Int,
-                      param :: F4Param,
-                      geob :: GeoBucket
-                          ) where {T,M}
+	                      param :: F4Param,
+	                      geob :: GeoBucket
+	                          ) where {T,M}
     m = mon(basis[l],1)    
 
     m ∈ done && return 
     push!(done, m)
 
     # search for a reducer for m but avoid l 
+    method = Val(select_reducer(param))
     we= 2^31
     i = 0 
     for j in 1:length(basis)
         j == l && continue 
         if divide(mon(basis[j],1),m,A) 
-            w = weight(basis[j],Val(select_reducer(param)))
+            w = weight(basis[j], method, A)
             if w <= we
                 i = j 
                 we = w 

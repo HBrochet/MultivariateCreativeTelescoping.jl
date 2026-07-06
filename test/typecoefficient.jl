@@ -1,5 +1,5 @@
 using Test
-using Nemo: finite_field, polynomial_ring, fraction_field, numerator, denominator, ZZ, QQ
+using Nemo: finite_field, polynomial_ring, fraction_field, numerator, denominator, ZZ, QQ, divexact
 using Nemo.Native: GF
 using MultivariateCreativeTelescoping
 
@@ -193,3 +193,120 @@ end
     @test @inferred(convertn(7, ctx)) == QQ(7)
     @test @inferred(normal(a, ctx)) === a
 end
+
+	@testset "TypeCoefficient: ring contexts (fraction-free)" begin
+	    function test_ringctx_ops(
+	        ctx::RingCtx{T,Tbuf},
+	        a::T,
+	        b::T,
+	        c::T,
+	        div_a::T,
+	        div_b::T,
+	        gcd_a::T,
+	        gcd_b::T,
+	    ) where {T,Tbuf}
+	        @test @inferred(opp(a, ctx)) == -a
+	        @test @inferred(add(a, b, ctx)) == a + b
+	        @test @inferred(sub(a, b, ctx)) == a - b
+	        @test @inferred(mul(a, b, ctx)) == a * b
+	
+	        aa = deepcopy(a)
+	        @test @inferred(opp!(aa, ctx)) == -a
+	
+	        aa = deepcopy(a)
+	        @test @inferred(add!(aa, b, ctx)) == a + b
+	
+	        aa = deepcopy(a)
+	        @test @inferred(sub!(aa, b, ctx)) == a - b
+	
+	        aa = deepcopy(a)
+	        @test @inferred(mul!(aa, b, ctx)) == a * b
+	
+	        aa = deepcopy(div_a)
+	        @test @inferred(divexact!(aa, div_b, ctx)) == divexact(div_a, div_b)
+
+	        @test @inferred(submul(a, b, c, ctx)) == a - b * c
+
+        inflated = @inferred(inflate(a, ctx))
+        @test @inferred(normal(inflated, ctx)) === inflated
+        @test @inferred(deflate(inflated, ctx)) == a
+
+        @test @inferred(Base.gcd(gcd_a, gcd_b, ctx)) == Base.gcd(gcd_a, gcd_b)
+
+        @test @inferred(zero(ctx)) == ctx.R(0)
+        @test @inferred(one(ctx)) == ctx.R(1)
+        @test @inferred(zero(T, ctx)) == ctx.R(0)
+        @test @inferred(one(T, ctx)) == ctx.R(1)
+        @test @inferred(iszero(zero(ctx), ctx))
+        @test @inferred(isone(one(ctx), ctx))
+
+        @test @inferred(convert(5, ctx)) == ctx.R(5)
+        @test @inferred(convertn(-3, ctx)) == ctx.R(-3)
+
+        @test_throws ErrorException inv(a, ctx)
+    end
+
+	    @testset "ZZCtx" begin
+	        ctx = zz_ctx()
+	        a = ZZ(6)
+	        b = ZZ(4)
+	        c = ZZ(3)
+	        div_a = ZZ(12)
+	        div_b = ZZ(3)
+	        gcd_a = ZZ(12)
+	        gcd_b = ZZ(18)
+	        test_ringctx_ops(ctx, a, b, c, div_a, div_b, gcd_a, gcd_b)
+	    end
+
+	    @testset "ZZPolyCtx" begin
+	        ctx = zzpoly_ctx("x")
+	        x = ctx.vars[1]
+	        a = x^2 + 2*x + 1
+	        b = x + 3
+	        c = x + 1
+	        div_a = (x + 1) * (x + 2)
+	        div_b = x + 1
+	        gcd_a = (x + 1) * (x + 2)
+	        gcd_b = (x + 1) * (x + 5)
+	        test_ringctx_ops(ctx, a, b, c, div_a, div_b, gcd_a, gcd_b)
+	    end
+
+	    @testset "ZZMPolyCtx" begin
+	        ctx = zzmpoly_ctx(["x", "y"])
+	        x, y = ctx.vars
+	        a = x^2 + y + 1
+	        b = x*y + 2
+	        c = x + y
+	        div_a = (x + y) * (x + 1)
+	        div_b = x + y
+	        gcd_a = (x + y) * (x + 1)
+	        gcd_b = (x + y) * (y + 2)
+	        test_ringctx_ops(ctx, a, b, c, div_a, div_b, gcd_a, gcd_b)
+	    end
+
+	    @testset "fpPolyCtx" begin
+	        ctx = fppoly_ctx(7, "x")
+	        x = ctx.vars[1]
+	        a = x^3 + 2*x + 1
+	        b = x + 3
+	        c = x + 1
+	        div_a = (x + 1) * (x + 2)
+	        div_b = x + 1
+	        gcd_a = (x + 1) * (x + 2)
+	        gcd_b = (x + 1) * (x + 5)
+	        test_ringctx_ops(ctx, a, b, c, div_a, div_b, gcd_a, gcd_b)
+	    end
+
+	    @testset "fpMPolyCtx" begin
+	        ctx = fpmpoly_ctx(7, ["x", "y"])
+	        x, y = ctx.vars
+	        a = x^2 + y^2 + 1
+	        b = x + y
+	        c = x + 2*y + 1
+	        div_a = (x + y) * (x + 1)
+	        div_b = x + y
+	        gcd_a = (x + y) * (x + 1)
+	        gcd_b = (x + y) * (y + 2)
+	        test_ringctx_ops(ctx, a, b, c, div_a, div_b, gcd_a, gcd_b)
+	    end
+	end

@@ -84,7 +84,7 @@ function lt(so :: POT{O}, a :: Signature{N}, b :: Signature{N}
     elseif b.ind < a.ind 
         return false
     else
-        return Base.order.lt(order(so),a.mon, b.mon) 
+        return lt(order(so),a.mon, b.mon) 
     end
 end
 

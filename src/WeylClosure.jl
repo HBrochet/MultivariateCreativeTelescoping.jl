@@ -154,11 +154,19 @@ Computes a polynomial vanishing on the singular locus of a D-module presented by
 function singular_locus(gens :: Vector{OrePoly{T,M}}, A :: OreAlg,init :: SingLocInit) where {T,M}
     nA = init.A
     ngens = map_algebras(gens,A,nA)
-    gb = f5(ngens,nA)
-    clear_denominators!(gb,nA)
-    pol = ctx(nA).R(1)
-    for p in gb 
-        pol = lcm(pol, numerator(coeff(p,1)))
+    if ctx(A) isa RingCtx
+        gb = f4(ngens,nA)
+        pol = ctx(nA).R(1)
+        for p in gb
+            pol = lcm(pol, coeff(p,1))
+        end
+    else
+        gb = f5(ngens,nA)
+        clear_denominators!(gb,nA)
+        pol = ctx(nA).R(1)
+        for p in gb 
+            pol = lcm(pol, numerator(coeff(p,1)))
+        end
     end
     return pol
 end
@@ -313,5 +321,4 @@ function singular_locus2(gens :: Vector{OrePoly{T,K}},A ::OreAlg, A2 :: OreAlg, 
     thelcm = lcm([Nemo.numerator(coeff(g,1)) for g in ngens])
     return thelcm
 end
-
 

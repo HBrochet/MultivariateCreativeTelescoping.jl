@@ -122,6 +122,19 @@ function expr_to_OreAlg_call(expr :: Expr, A :: OreAlg)
             bound = numerator(bound,false)
         elseif bound isa fpFieldElem
             bound = bound.data
+        elseif bound isa ZZPolyRingElem || bound isa fpPolyRingElem || bound isa FpPolyRingElem ||
+               bound isa ZZMPolyRingElem || bound isa fpMPolyRingElem || bound isa FpMPolyRingElem
+            cst = constant_coefficient(bound)
+            # For fraction-free contexts, exponents must be constant polynomials.
+            if bound != parent(bound)(cst)
+                error("exponent must be a constant integer polynomial, got $(bound)")
+            end
+            bound = cst
+            if bound isa ZZRingElem
+                bound = bound.d
+            elseif bound isa fpFieldElem
+                bound = bound.data
+            end
         # elseif bound isa SLP 
         #     bound = eval(bound,[ctx(A).R(0) for i in 1:number_of_variables(ctx(A).R)],A)
         #     bound = constant_coefficient(bound)
