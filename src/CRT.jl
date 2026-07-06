@@ -81,7 +81,96 @@ end
 # the tracer assume f can be called with f(...;tracer=Val(true)) to learn and return a trace  
 # and f(trace,...) to apply the trace at subsequent computations
 
-function compute_with_CRT(f::F, A::OreAlg, args...; param::CRTParam = crt_param()) where {F<:Function}
+function _crt_compute_prime(f::F, ctxA, prime::Int, A::OreAlg, args...) where {F<:Function}
+    nA, mod_args = _modp_args(ctxA, prime, A, args...)
+    return f(mod_args...)
+end
+
+function _crt_compute_prime_with_trace(f::F, trace, ctxA, prime::Int, A::OreAlg, args...) where {F<:Function}
+    nA, mod_args = _modp_args(ctxA, prime, A, args...)
+    return f(trace, mod_args...)
+end
+
+function _crt_learn_trace_prime(f::F, ctxA, prime::Int, A::OreAlg, args...) where {F<:Function}
+    nA, mod_args = _modp_args(ctxA, prime, A, args...)
+    return f(mod_args...; tracer = Val(true))
+end
+
+function _crt_learn_trace_prime_batch(
+    f::F,
+    ctxA,
+    prime_indices::UnitRange{Int},
+    A::OreAlg,
+    args...;
+    parallel::Bool = false,
+) where {F<:Function}
+    if !parallel || length(prime_indices) == 1
+        return [
+            begin
+                prime = primes[i]
+                res, trace = _crt_learn_trace_prime(f, ctxA, prime, A, args...)
+                (i, prime, res, trace)
+            end
+            for i in prime_indices
+        ]
+    end
+
+    tasks = [
+        Threads.@spawn begin
+            prime = primes[i]
+            res, trace = _crt_learn_trace_prime(f, ctxA, prime, A, args...)
+            (i, prime, res, trace)
+        end
+        for i in prime_indices
+    ]
+    return fetch.(tasks)
+end
+
+function _crt_compute_prime_batch(
+    f::F,
+    ctxA,
+    prime_indices::UnitRange{Int},
+    A::OreAlg,
+    args...;
+    trace = nothing,
+    parallel::Bool = false,
+) where {F<:Function}
+    if !parallel || length(prime_indices) == 1
+        return [
+            begin
+                prime = primes[i]
+                res = trace === nothing ?
+                    _crt_compute_prime(f, ctxA, prime, A, args...) :
+                    _crt_compute_prime_with_trace(f, trace, ctxA, prime, A, args...)
+                (i, prime, res)
+            end
+            for i in prime_indices
+        ]
+    end
+
+    tasks = [
+        Threads.@spawn begin
+            prime = primes[i]
+            res = trace === nothing ?
+                _crt_compute_prime(f, ctxA, prime, A, args...) :
+                _crt_compute_prime_with_trace(f, trace, ctxA, prime, A, args...)
+            (i, prime, res)
+        end
+        for i in prime_indices
+    ]
+    return fetch.(tasks)
+end
+
+function compute_with_CRT(
+    f::F,
+    A::OreAlg,
+    args...;
+    param::CRTParam = crt_param(),
+    parallel::Bool = false,
+    batch_size::Integer = Threads.nthreads(),
+) where {F<:Function}
+    batch_size = max(1, Int(batch_size))
+    parallel = parallel && batch_size > 1 && Threads.nthreads() > 1
     nprime = 1
     globalstats.counters[:number_primes] += 1
     primes_ = Int[primes[1]]
@@ -93,20 +182,42 @@ function compute_with_CRT(f::F, A::OreAlg, args...; param::CRTParam = crt_param(
 
     ctxA = ctx(A)
     if tracer(param)
-        nA, mod_args = _modp_args(ctxA, prime, A, args...)
-        tmp, trace = f(mod_args...;tracer=Val(true))
-        res_modp = [tmp]
-        tab_tr = [trace]
-        for _ in 2:3
-            nprime += 1
-            globalstats.counters[:number_primes] += 1
-            prime = primes[nprime]
-            push!(primes_, prime)
-            @debug "computing the function for $(nprime)th prime"
+        if parallel
+            globalstats.counters[:number_primes] += 2
+            empty!(primes_)
+            nprime = 3
+            @debug "learning the trace for primes 1:3"
+            batch = _crt_learn_trace_prime_batch(
+                f,
+                ctxA,
+                1:3,
+                A,
+                args...;
+                parallel = true,
+            )
+            res_modp = typeof(batch[1][3])[]
+            tab_tr = typeof(batch[1][4])[]
+            for (_, prime, tmp, trace) in batch
+                push!(primes_, prime)
+                push!(res_modp, tmp)
+                push!(tab_tr, trace)
+            end
+        else
             nA, mod_args = _modp_args(ctxA, prime, A, args...)
             tmp, trace = f(mod_args...;tracer=Val(true))
-            push!(res_modp, tmp)
-            push!(tab_tr, trace)
+            res_modp = [tmp]
+            tab_tr = [trace]
+            for _ in 2:3
+                nprime += 1
+                globalstats.counters[:number_primes] += 1
+                prime = primes[nprime]
+                push!(primes_, prime)
+                @debug "computing the function for $(nprime)th prime"
+                nA, mod_args = _modp_args(ctxA, prime, A, args...)
+                tmp, trace = f(mod_args...;tracer=Val(true))
+                push!(res_modp, tmp)
+                push!(tab_tr, trace)
+            end
         end
         majority_test!(tab_tr,[1,2,3], A)
         if length(tab_tr) < 2 
@@ -132,7 +243,7 @@ function compute_with_CRT(f::F, A::OreAlg, args...; param::CRTParam = crt_param(
                 @debug "reconstructions are not consistent, trying more primes"
                 prev_res = res
             end
-        elseif nprime == bnd
+        elseif nprime >= bnd
             @debug "trying to reconstruct result via CRT"
             majority_test!(res_modp, primes_, A)
             try
@@ -164,18 +275,25 @@ function compute_with_CRT(f::F, A::OreAlg, args...; param::CRTParam = crt_param(
         #     error("fin")
         # end
 
-        nprime += 1 
-        globalstats.counters[:number_primes] += 1
-        prime = primes[nprime]
-        push!(primes_,prime)
-        @debug "computing the function for $(nprime)th prime"
-        if tracer(param)
-            nA, mod_args = _modp_args(ctxA, prime, A, args...)
-            push!(res_modp, f(trace, mod_args...))
-        else
-            nA, mod_args = _modp_args(ctxA, prime, A, args...)
-            push!(res_modp, f(mod_args...))
+        next_nprime = nprime + 1
+        n_to_compute = succeeded ? 1 : (parallel ? min(batch_size, max(1, bnd - nprime)) : 1)
+        last_nprime = nprime + n_to_compute
+        globalstats.counters[:number_primes] += n_to_compute
+        @debug "computing the function for primes $(next_nprime):$(last_nprime)"
+        batch = _crt_compute_prime_batch(
+            f,
+            ctxA,
+            next_nprime:last_nprime,
+            A,
+            args...;
+            trace = tracer(param) ? trace : nothing,
+            parallel = parallel,
+        )
+        for (_, prime, res) in batch
+            push!(primes_, prime)
+            push!(res_modp, res)
         end
+        nprime = last_nprime
     end
 end
 
