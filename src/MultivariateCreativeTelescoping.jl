@@ -5,6 +5,7 @@ using Combinatorics
 using Nemo
 using DataStructures
 using ExportAll
+using ParamPunPam
 
 using FLINT_jll: libflint
 
@@ -36,6 +37,7 @@ include("TypeSigPair.jl")
 include("F5.jl")
 
 include("WeylClosure.jl")
+include("WeylClosureSingleTNoMulDi.jl")
 
 include("echelon_form.jl")
 include("Reductions.jl")
@@ -44,10 +46,14 @@ include("DerivRedMap.jl")
 include("DerivRedMapMany.jl")
 include("MCT.jl")
 include("MCTMany.jl")
+include("PicardFuchs.jl")
+include("Picard_fuchs.jl")
 
 include("AlgebraMorphisms.jl")
 include("CRT.jl")
 include("CauchyInterpolation.jl")
+include("Picard_fuchs_crt.jl")
+include("ModuleGroebner.jl")
 
 include("annfs.jl")
 include("dfinite_parser/database_LDE.jl")
